@@ -30,7 +30,7 @@ export function ImageCarousel({ images }: ImageCarouselProps) {
   }
 
   return (
-    <div className="relative w-full h-[400px] md:h-[500px] overflow-hidden rounded-lg group">
+    <div className="relative w-full h-[250px] sm:h-[300px] md:h-[400px] lg:h-[500px] overflow-hidden rounded-lg group">
       {/* Images */}
       {images.map((image, index) => (
         <div

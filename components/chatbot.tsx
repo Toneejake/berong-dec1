@@ -152,7 +152,7 @@ export function Chatbot() {
 
       {/* Chatbot Window */}
       {isOpen && (
-        <Card className="fixed bottom-6 right-6 w-96 h-[500px] flex flex-col shadow-2xl z-50 border-secondary">
+        <Card className="fixed bottom-6 right-6 w-full max-w-sm h-[70vh] min-h-[400px] flex flex-col shadow-2xl z-50 border-secondary">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b bg-primary text-primary-foreground rounded-t-lg">
             <div className="flex items-center gap-2">

@@ -584,7 +584,7 @@ export default function AdminPage() {
                 <CardDescription>Add images to the dashboard carousel</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="carousel-title">Title</Label>
                     <Input
@@ -663,7 +663,7 @@ export default function AdminPage() {
                 <CardDescription>Create educational content for adult and professional sections</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="blog-title">Title</Label>
                     <Input
@@ -789,7 +789,7 @@ export default function AdminPage() {
                     rows={2}
                   />
                 </div>
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="video-youtube-id">YouTube ID</Label>
                     <Input
@@ -809,7 +809,7 @@ export default function AdminPage() {
                     />
                   </div>
                 </div>
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="video-category">Category</Label>
                     <select

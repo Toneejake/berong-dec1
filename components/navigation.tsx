@@ -29,10 +29,10 @@ export function Navigation() {
                 />
                 <div>
                   <h1 className="text-xl md:text-2xl font-bold leading-tight">
-                    BUREAU OF FIRE PROTECTION
+                    BUREAU OF FIRE PROTECTION STA CRUZ LAGUNA
                   </h1>
                   <p className="text-sm md:text-base font-semibold text-red-100">
-                    STA CRUZ LAGUNA
+                    
                   </p>
                 </div>
               </div>
