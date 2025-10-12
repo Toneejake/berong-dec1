@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { Bell, LogOut, User, Menu, X, Home, Users, Briefcase, Baby, Shield } from "lucide-react"
 import Image from "next/image"
+import { NotificationPopover } from "@/components/ui/notification-popover"
 
 export function Navigation() {
   const { user, logout, isAuthenticated } = useAuth()
@@ -31,7 +32,7 @@ export function Navigation() {
                   <h1 className="text-xl md:text-2xl font-bold leading-tight">
                     BUREAU OF FIRE PROTECTION STA CRUZ LAGUNA
                   </h1>
-                  <p className="text-sm md:text-base font-semibold text-red-100">
+                  <p className="text-sm md:text-base font-semibold text-red-10">
                     
                   </p>
                 </div>
@@ -91,7 +92,7 @@ export function Navigation() {
             <div className="hidden md:flex items-center space-x-6">
               <Link
                 href="/"
-                className="flex items-center gap-2 text-gray-700 hover:text-red-700 font-medium transition-colors px-3 py-2 rounded-md hover:bg-red-50"
+                className="flex items-center gap-2 text-gray-700 hover:text-red-70 font-medium transition-colors px-3 py-2 rounded-md hover:bg-red-50"
               >
                 <Home className="h-4 w-4" />
                 Dashboard
@@ -100,7 +101,7 @@ export function Navigation() {
               {isAuthenticated && user?.permissions.accessProfessional && (
                 <Link
                   href="/professional"
-                  className="flex items-center gap-2 text-gray-700 hover:text-red-700 font-medium transition-colors px-3 py-2 rounded-md hover:bg-red-50"
+                  className="flex items-center gap-2 text-gray-700 hover:text-red-70 font-medium transition-colors px-3 py-2 rounded-md hover:bg-red-50"
                 >
                   <Briefcase className="h-4 w-4" />
                   Professional
@@ -143,13 +144,11 @@ export function Navigation() {
               {isAuthenticated ? (
                 <>
                   <div className="hidden sm:block text-right mr-3">
-                    <p className="text-sm font-semibold text-gray-900">{user?.name}</p>
-                    <p className="text-xs text-gray-600 capitalize">{user?.role}</p>
+                    <p className="text-sm font-semibold text-gray-90">{user?.name}</p>
+                    <p className="text-xs text-gray-60 capitalize">{user?.role}</p>
                   </div>
                   {/*Notification Settings*/}
-                  <Button variant="outline" size="icon" className="border-red-200 text-red-700 hover:bg-red-50">
-                    <Bell className="h-4 w-4" />
-                  </Button>
+                  <NotificationPopover />
                   <Link href="/profile">
                     <Button variant="outline" size="icon" className="border-red-200 text-red-700 hover:bg-red-50">
                       <User className="h-4 w-4" />
@@ -191,7 +190,7 @@ export function Navigation() {
             <div className="px-2 pt-2 pb-3 space-y-1">
               <Link
                 href="/"
-                className="flex items-center gap-3 px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:text-red-700 hover:bg-red-50 transition-colors"
+                className="flex items-center gap-3 px-3 py-3 rounded-md text-base font-medium text-gray-70 hover:text-red-700 hover:bg-red-50 transition-colors"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 <Home className="h-5 w-5" />
@@ -212,7 +211,7 @@ export function Navigation() {
               {isAuthenticated && user?.permissions.accessAdult && (
                 <Link
                   href="/adult"
-                  className="flex items-center gap-3 px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:text-red-700 hover:bg-red-50 transition-colors"
+                  className="flex items-center gap-3 px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:text-red-70 hover:bg-red-50 transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   <Users className="h-5 w-5" />
@@ -223,7 +222,7 @@ export function Navigation() {
               {isAuthenticated && user?.permissions.accessKids && (
                 <Link
                   href="/kids"
-                  className="flex items-center gap-3 px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:text-red-700 hover:bg-red-50 transition-colors"
+                  className="flex items-center gap-3 px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:text-red-70 hover:bg-red-50 transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   <Baby className="h-5 w-5" />
@@ -248,7 +247,7 @@ export function Navigation() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-semibold text-gray-900">{user?.name}</p>
-                      <p className="text-xs text-gray-600 capitalize">{user?.role}</p>
+                      <p className="text-xs text-gray-60 capitalize">{user?.role}</p>
                     </div>
                     <Button
                       variant="outline"

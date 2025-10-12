@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Shield, Video, Clock, Search, BookOpen, FileText, AlertCircle, Play } from "lucide-react"
 import type { VideoContent } from "@/lib/mock-data"
+import { ManualsDialog } from "@/components/ui/manuals-dialog"
 
 export default function ProfessionalPage() {
   const router = useRouter()
@@ -241,10 +242,12 @@ export default function ProfessionalPage() {
                   Access comprehensive manuals covering firefighting operations, emergency response protocols, and
                   safety procedures.
                 </p>
-                <Button className="bg-secondary hover:bg-secondary/90 text-secondary-foreground">
-                  <FileText className="h-4 w-4 mr-2" />
-                  View Manuals
-                </Button>
+                <ManualsDialog>
+                  <Button className="bg-secondary hover:bg-secondary/90 text-secondary-foreground cursor-pointer">
+                    <FileText className="h-4 w-4 mr-2" />
+                    View Manuals
+                  </Button>
+                </ManualsDialog>
               </CardContent>
             </Card>
 
