@@ -26,6 +26,7 @@ export function Chatbot() {
   const [inputValue, setInputValue] = useState("")
  const [quickQuestions, setQuickQuestions] = useState<Record<string, QuickQuestion[]>>({})
   const [loadingQuestions, setLoadingQuestions] = useState(true)
+  const [showQuickQuestions, setShowQuickQuestions] = useState(true)
 
   // Load quick questions when the component mounts
   useEffect(() => {
@@ -55,6 +56,9 @@ export function Chatbot() {
           }
         ])
       }
+
+      // Show quick questions when opening chatbot
+      setShowQuickQuestions(true);
 
       // Load quick questions if not already loaded
       if (Object.keys(quickQuestions).length === 0) {
@@ -172,8 +176,8 @@ export function Chatbot() {
           {/* Quick Questions */}
           {loadingQuestions ? (
             <div className="p-4 text-center text-sm text-muted-foreground">Loading quick questions...</div>
-          ) : Object.keys(quickQuestions).length > 0 && messages.length <= 1 ? (
-            <div className="p-4 border-b max-h-40 overflow-y-auto">
+          ) : Object.keys(quickQuestions).length > 0 && showQuickQuestions ? (
+            <div className="p-4 border-b max-h-40 overflow-y-auto" id="quick-questions-section">
               <h4 className="font-semibold text-sm text-muted-foreground mb-2">Quick Questions:</h4>
               <div className="space-y-2 max-h-32 overflow-y-auto">
                 {Object.entries(quickQuestions).map(([category, questions]) => (
@@ -218,7 +222,13 @@ export function Chatbot() {
             <div className="flex gap-2">
               <Input
                 value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
+                onChange={(e) => {
+                  setInputValue(e.target.value);
+                  // Hide quick questions when user starts typing
+                  if (e.target.value.trim() !== '') {
+                    setShowQuickQuestions(false);
+                  }
+                }}
                 onKeyPress={(e) => e.key === "Enter" && handleSend()}
                 placeholder="Ask about fire safety..."
                 className="flex-1"
