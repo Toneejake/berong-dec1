@@ -1,26 +1,36 @@
 ﻿"use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Upload, Grid3x3, Settings, Play, Loader2, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft } from "lucide-react"
 import { FloorPlanUpload } from "@/components/floor-plan-upload"
-import { GridVisualization } from "@/components/grid-visualization"
+import { FloorPlanCanvas } from "@/components/floor-plan-canvas"
 import { SimulationSetup } from "@/components/simulation-setup"
 import { SimulationResults } from "@/components/simulation-results"
 
-type Stage = "upload" | "grid" | "setup" | "running" | "results"
+type Stage = "upload" | "exits" | "setup" | "running" | "results"
+
+interface Exit {
+  id: string
+  x: number
+  y: number
+  pixelX: number
+  pixelY: number
+}
 
 interface SimulationData {
   imageFile: File | null
   grid: number[][] | null
+  originalImage: string | null
+  gridSize: { width: number; height: number } | null
+  userExits: Exit[]
   config: {
     numAgents: number
     firePosition: [number, number] | null
     agentPositions: [number, number][]
-    exits: [number, number][]
   }
   jobId: string | null
   results: any | null
@@ -28,14 +38,17 @@ interface SimulationData {
 
 export function SimulationWizard() {
   const [stage, setStage] = useState<Stage>("upload")
+  const [exitMode, setExitMode] = useState<'view' | 'add-exit'>('view')
   const [data, setData] = useState<SimulationData>({
     imageFile: null,
     grid: null,
+    originalImage: null,
+    gridSize: null,
+    userExits: [],
     config: {
       numAgents: 5,
       firePosition: null,
-      agentPositions: [],
-      exits: []
+      agentPositions: []
     },
     jobId: null,
     results: null
@@ -43,9 +56,45 @@ export function SimulationWizard() {
   const [error, setError] = useState<string | null>(null)
   const [processing, setProcessing] = useState(false)
 
+  // Persist state to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sim-wizard-state', JSON.stringify({
+        stage,
+        data: {
+          ...data,
+          imageFile: null, // Can't serialize File
+          results: data.results ? 'cached' : null
+        }
+      }))
+    }
+  }, [stage, data])
+
+  // Restore state on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('sim-wizard-state')
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved)
+          if (parsed.data.grid) {
+            setData(prev => ({
+              ...prev,
+              ...parsed.data,
+              imageFile: null
+            }))
+            // Don't auto-restore stage to prevent confusion
+          }
+        } catch (e) {
+          console.error('Failed to restore state:', e)
+        }
+      }
+    }
+  }, [])
+
   const stages = [
     { id: "upload", label: "Upload Floor Plan", icon: Upload },
-    { id: "grid", label: "View Grid", icon: Grid3x3 },
+    { id: "exits", label: "Place Exits", icon: Grid3x3 },
     { id: "setup", label: "Configure Simulation", icon: Settings },
     { id: "results", label: "View Results", icon: Play }
   ]
@@ -67,18 +116,25 @@ export function SimulationWizard() {
       })
 
       if (!response.ok) {
-        throw new Error("Failed to process image")
+        const errorData = await response.json()
+        console.error('Backend error:', errorData)
+        throw new Error(errorData.error || "Failed to process image")
       }
 
       const result = await response.json()
+      console.log('Process image result:', result)
       
       setData(prev => ({
         ...prev,
         imageFile: file,
-        grid: result.grid
+        grid: result.grid,
+        originalImage: result.originalImage,
+        gridSize: result.gridSize
       }))
-      setStage("grid")
+      setStage("exits")
+      setExitMode('add-exit') // Auto-enable exit placement mode
     } catch (err) {
+      console.error('Image upload error:', err)
       setError(err instanceof Error ? err.message : "Failed to process image")
     } finally {
       setProcessing(false)
@@ -98,28 +154,40 @@ export function SimulationWizard() {
     setStage("running")
 
     try {
+      // Convert user exits to tuple format
+      const exitsForBackend = data.userExits.map(exit => [exit.x, exit.y] as [number, number])
+
+      console.log('Starting simulation with:', {
+        userExits: exitsForBackend.length,
+        agents: data.config.agentPositions.length
+      })
+
       // Submit simulation job
       const response = await fetch("/api/simulation/run-simulation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           grid: data.grid,
-          exits: data.config.exits.length > 0 ? data.config.exits : null,
+          exits: exitsForBackend.length > 0 ? exitsForBackend : null,
           fire_position: data.config.firePosition,
           agent_positions: data.config.agentPositions
         })
       })
 
       if (!response.ok) {
-        throw new Error("Failed to start simulation")
+        const errorData = await response.json()
+        console.error('Simulation start error:', errorData)
+        throw new Error(errorData.error || "Failed to start simulation")
       }
 
       const { job_id } = await response.json()
+      console.log('Simulation job started:', job_id)
       setData(prev => ({ ...prev, jobId: job_id }))
 
       // Poll for results
       await pollSimulationStatus(job_id)
     } catch (err) {
+      console.error('Run simulation error:', err)
       setError(err instanceof Error ? err.message : "Failed to run simulation")
       setStage("setup")
     } finally {
@@ -128,39 +196,61 @@ export function SimulationWizard() {
   }
 
   const pollSimulationStatus = async (jobId: string) => {
-    const maxAttempts = 60
+    const maxAttempts = 120 // 2 minutes max
     let attempts = 0
 
     while (attempts < maxAttempts) {
-      const response = await fetch(`/api/simulation/status/${jobId}`)
-      const status = await response.json()
+      try {
+        const response = await fetch(`/api/simulation/status/${jobId}`)
+        
+        if (!response.ok) {
+          console.error('Status check failed:', response.status)
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          attempts++
+          continue
+        }
 
-      if (status.status === "complete") {
-        setData(prev => ({ ...prev, results: status.result }))
-        setStage("results")
-        return
+        const status = await response.json()
+        console.log(`Status check ${attempts + 1}:`, status.status)
+
+        if (status.status === "complete") {
+          console.log('Simulation complete!', status.result)
+          setData(prev => ({ ...prev, results: status.result }))
+          setStage("results")
+          return
+        }
+
+        if (status.status === "failed") {
+          console.error('Simulation failed:', status.error)
+          throw new Error(status.error || "Simulation failed")
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        attempts++
+      } catch (err) {
+        console.error('Poll error:', err)
+        throw err
       }
-
-      if (status.status === "failed") {
-        throw new Error(status.error || "Simulation failed")
-      }
-
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      attempts++
     }
 
-    throw new Error("Simulation timeout")
+    throw new Error("Simulation timeout after 2 minutes")
   }
 
   const handleReset = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('sim-wizard-state')
+    }
+    
     setData({
       imageFile: null,
       grid: null,
+      originalImage: null,
+      gridSize: null,
+      userExits: [],
       config: {
         numAgents: 5,
         firePosition: null,
-        agentPositions: [],
-        exits: []
+        agentPositions: []
       },
       jobId: null,
       results: null
@@ -206,37 +296,57 @@ export function SimulationWizard() {
         <FloorPlanUpload onUpload={handleImageUpload} processing={processing} />
       )}
 
-      {stage === "grid" && data.grid && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Processed Floor Plan Grid</CardTitle>
-            <CardDescription>
-              AI has converted your floor plan into a {data.grid.length}{data.grid[0]?.length} grid
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <GridVisualization grid={data.grid} />
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setStage("upload")}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Upload Different Plan
-              </Button>
-              <Button onClick={() => setStage("setup")}>
-                Configure Simulation
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      {stage === "exits" && data.grid && data.originalImage && data.gridSize && (
+        <div className="space-y-4">
+          <FloorPlanCanvas
+            originalImage={data.originalImage}
+            grid={data.grid}
+            gridSize={data.gridSize}
+            exits={data.userExits}
+            onExitsChange={(exits) => setData(prev => ({ ...prev, userExits: exits }))}
+            mode={exitMode}
+            onModeChange={setExitMode}
+          />
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex gap-2 justify-between">
+                <Button variant="outline" onClick={() => setStage("upload")}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Upload Different Plan
+                </Button>
+                <Button 
+                  onClick={() => setStage("setup")}
+                  disabled={data.userExits.length === 0}
+                >
+                  Configure Simulation
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
+              {data.userExits.length === 0 && (
+                <p className="text-sm text-amber-600 mt-2">
+                  ⚠️ Place at least 1 exit to continue
+                </p>
+              )}
+              {data.userExits.length > 0 && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  ℹ️ Your {data.userExits.length} exit{data.userExits.length !== 1 ? 's' : ''} will distribute 248 AI model exits evenly
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {stage === "setup" && data.grid && (
         <SimulationSetup
           grid={data.grid}
-          config={data.config}
+          config={{
+            ...data.config,
+            exits: data.userExits.map(e => [e.x, e.y] as [number, number])
+          }}
           onConfigUpdate={handleConfigUpdate}
           onRunSimulation={handleRunSimulation}
-          onBack={() => setStage("grid")}
+          onBack={() => setStage("exits")}
           processing={processing}
         />
       )}
@@ -246,9 +356,14 @@ export function SimulationWizard() {
           <CardContent className="py-12 text-center">
             <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-primary" />
             <h3 className="text-xl font-semibold mb-2">Running Simulation...</h3>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground mb-4">
               AI is calculating optimal evacuation routes
             </p>
+            {data.jobId && (
+              <p className="text-xs text-muted-foreground">
+                Job ID: {data.jobId.substring(0, 8)}...
+              </p>
+            )}
           </CardContent>
         </Card>
       )}

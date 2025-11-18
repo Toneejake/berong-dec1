@@ -10,9 +10,10 @@ async function main() {
   // Create admin user
   const adminPassword = await bcrypt.hash('admin123', 10)
   const adminUser = await prisma.user.upsert({
-    where: { email: 'admin@bfp.gov.ph' },
+    where: { username: 'admin' },
     update: {},
     create: {
+      username: 'admin',
       email: 'admin@bfp.gov.ph',
       password: adminPassword,
       name: 'BFP Administrator',
@@ -21,7 +22,7 @@ async function main() {
       isActive: true,
     },
   })
-  console.log('✅ Created admin user:', adminUser.email)
+  console.log('✅ Created admin user:', adminUser.username, '/', adminUser.email)
 
   // Create sample users for testing
   const kidPassword = await bcrypt.hash('kid123', 10)
@@ -29,9 +30,10 @@ async function main() {
   const professionalPassword = await bcrypt.hash('pro123', 10)
 
   const kidUser = await prisma.user.upsert({
-    where: { email: 'kid@bfp.gov.ph' },
+    where: { username: 'testkid' },
     update: {},
     create: {
+      username: 'testkid',
       email: 'kid@bfp.gov.ph',
       password: kidPassword,
       name: 'Young Firefighter',
@@ -42,9 +44,10 @@ async function main() {
   })
 
   const adultUser = await prisma.user.upsert({
-    where: { email: 'adult@bfp.gov.ph' },
+    where: { username: 'testadult' },
     update: {},
     create: {
+      username: 'testadult',
       email: 'adult@bfp.gov.ph',
       password: adultPassword,
       name: 'John Smith',
@@ -55,9 +58,10 @@ async function main() {
   })
 
   const professionalUser = await prisma.user.upsert({
-    where: { email: 'pro@bfp.gov.ph' },
+    where: { username: 'testpro' },
     update: {},
     create: {
+      username: 'testpro',
       email: 'pro@bfp.gov.ph',
       password: professionalPassword,
       name: 'Firefighter Cruz',
@@ -68,6 +72,9 @@ async function main() {
   })
 
   console.log('✅ Created sample users')
+  console.log('   - Kid:', kidUser.username, '/', kidUser.email)
+  console.log('   - Adult:', adultUser.username, '/', adultUser.email)
+  console.log('   - Professional:', professionalUser.username, '/', professionalUser.email)
 
   // Seed carousel images
   const carouselImages = [

@@ -15,26 +15,35 @@ async function ensureConnection() {
   }
 }
 
-export async function registerUser(email: string, password: string, name: string, age: number) {
+export async function registerUser(username: string, password: string, name: string, age: number) {
   try {
     await ensureConnection();
     
     // Validate input
-    if (!email || !password || !name || !age) {
+    if (!username || !password || !name || !age) {
       throw new Error('All fields are required');
+    }
+
+    // Validate username (alphanumeric, 3-20 characters)
+    if (username.length < 3 || username.length > 20) {
+      throw new Error('Username must be between 3 and 20 characters');
+    }
+
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      throw new Error('Username can only contain letters, numbers, and underscores');
     }
 
     if (password.length < 6) {
       throw new Error('Password must be at least 6 characters');
     }
 
-    // Check if user exists
+    // Check if username exists
     const existingUser = await prisma.user.findUnique({
-      where: { email },
+      where: { username },
     });
 
     if (existingUser) {
-      throw new Error('User already exists');
+      throw new Error('Username already taken. Please choose another one.');
     }
 
     // Hash password
@@ -46,7 +55,7 @@ export async function registerUser(email: string, password: string, name: string
     // Create user
     const user = await prisma.user.create({
       data: {
-        email,
+        username,
         password: hashedPassword,
         name,
         age,
@@ -54,53 +63,79 @@ export async function registerUser(email: string, password: string, name: string
       },
       select: {
         id: true,
-        email: true,
+        username: true,
         name: true,
         role: true,
         age: true,
+        isActive: true,
+        createdAt: true,
       },
     });
 
-    return { success: true, user };
+    // Determine permissions based on role
+    const permissions = determinePermissions(role);
+
+    return { 
+      success: true, 
+      user: {
+        ...user,
+        permissions,
+        createdAt: user.createdAt.toISOString(),
+      }
+    };
   } catch (error: any) {
     console.error('Registration error:', error);
     return { success: false, error: error.message || 'Registration failed' };
   }
 }
 
-export async function loginUser(email: string, password: string) {
+export async function loginUser(identifier: string, password: string) {
   try {
     await ensureConnection();
 
     // Validate input
-    if (!email || !password) {
-      throw new Error('Email and password are required');
+    if (!identifier || !password) {
+      throw new Error('Username/Email and password are required');
     }
 
-    // Find user
-    const user = await prisma.user.findUnique({
-      where: { email },
+    // Try to find user by username first, then by email
+    let user = await prisma.user.findUnique({
+      where: { username: identifier },
     });
 
+    // If not found by username, try email
     if (!user) {
-      throw new Error('Invalid credentials');
+      user = await prisma.user.findUnique({
+        where: { email: identifier },
+      });
+    }
+
+    if (!user) {
+      throw new Error('Invalid username/email or password');
     }
 
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.password);
 
     if (!isValidPassword) {
-      throw new Error('Invalid credentials');
+      throw new Error('Invalid username/email or password');
     }
+
+    // Determine permissions based on role
+    const permissions = determinePermissions(user.role);
 
     return {
       success: true,
       user: {
         id: user.id,
+        username: user.username,
         email: user.email,
         name: user.name,
         role: user.role,
         age: user.age,
+        permissions,
+        isActive: user.isActive,
+        createdAt: user.createdAt.toISOString(),
       },
     };
   } catch (error: any) {
@@ -109,6 +144,48 @@ export async function loginUser(email: string, password: string) {
   }
 }
 
+// Determine permissions based on role
+function determinePermissions(role: UserRole) {
+  switch (role) {
+    case UserRole.admin:
+      return {
+        accessKids: true,
+        accessAdult: true,
+        accessProfessional: true,
+        isAdmin: true,
+      };
+    case UserRole.professional:
+      return {
+        accessKids: true,
+        accessAdult: true,
+        accessProfessional: true,
+        isAdmin: false,
+      };
+    case UserRole.adult:
+      return {
+        accessKids: false,
+        accessAdult: true,
+        accessProfessional: false,
+        isAdmin: false,
+      };
+    case UserRole.kid:
+      return {
+        accessKids: true,
+        accessAdult: false,
+        accessProfessional: false,
+        isAdmin: false,
+      };
+    default:
+      return {
+        accessKids: false,
+        accessAdult: false,
+        accessProfessional: false,
+        isAdmin: false,
+      };
+  }
+}
+
 export async function disconnectDatabase() {
   await prisma.$disconnect();
 }
+

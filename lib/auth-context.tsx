@@ -7,7 +7,7 @@ export type UserRole = "guest" | "kid" | "adult" | "professional" | "admin"
 
 export interface User {
   id: number
-  email: string
+  username: string
   name: string
   age: number
   role: UserRole
@@ -23,14 +23,28 @@ export interface User {
 
 interface AuthContextType {
   user: User | null
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
-  register: (email: string, password: string, name: string, age: number) => Promise<{ success: boolean; error?: string }>
+  login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>
+  register: (username: string, password: string, name: string, age: number) => Promise<{ success: boolean; error?: string }>
   logout: () => void
   isLoading: boolean
+  isAuthenticated: boolean
   isAuthenticating: boolean
+  getRedirectPath: () => string
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+// Helper function to determine redirect path based on user role
+function determineRedirectPath(user: User | null): string {
+  if (!user) return '/'
+  
+  if (user.role === 'admin') return '/admin'
+  if (user.role === 'professional') return '/professional'
+  if (user.role === 'adult') return '/adult'
+  if (user.role === 'kid') return '/kids'
+  
+  return '/'
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -93,7 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const register = async (email: string, password: string, name: string, age: number): Promise<{ success: boolean; error?: string }> => {
+  const register = async (username: string, password: string, name: string, age: number): Promise<{ success: boolean; error?: string }> => {
     setIsAuthenticating(true)
     try {
       const response = await fetch('/api/auth/register', {
@@ -101,7 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password, name, age }),
+        body: JSON.stringify({ username, password, name, age }),
       })
 
       const data = await response.json()
@@ -112,6 +126,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(data.user)
       localStorage.setItem('user', JSON.stringify(data.user))
+      
+      // Set cookie for middleware
+      document.cookie = `bfp_user=${encodeURIComponent(JSON.stringify(data.user))}; path=/; max-age=${60 * 60 * 24 * 7}` // 7 days
+      
       return { success: true }
     } catch (error: any) {
       console.error('Registration error:', error)
@@ -121,7 +139,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+  const login = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
     setIsAuthenticating(true)
     try {
       const response = await fetch('/api/auth/login', {
@@ -129,7 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ username, password }),
       })
 
       const data = await response.json()
@@ -140,6 +158,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(data.user)
       localStorage.setItem('user', JSON.stringify(data.user))
+      
+      // Set cookie for middleware
+      document.cookie = `bfp_user=${encodeURIComponent(JSON.stringify(data.user))}; path=/; max-age=${60 * 60 * 24 * 7}` // 7 days
+      
       return { success: true }
     } catch (error: any) {
       console.error('Login error:', error)
@@ -154,8 +176,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('user')
   }
 
+  const getRedirectPath = () => {
+    return determineRedirectPath(user)
+  }
+
+  const isAuthenticated = user !== null
+
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, isLoading, isAuthenticating }}>
+    <AuthContext.Provider value={{ user, login, register, logout, isLoading, isAuthenticated, isAuthenticating, getRedirectPath }}>
       {children}
     </AuthContext.Provider>
   )

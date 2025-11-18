@@ -4,16 +4,17 @@ import { loginUser } from '@/lib/auth-utils'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, password } = body
+    const { username, password } = body
 
-    if (!email || !password) {
+    if (!username || !password) {
       return NextResponse.json(
-        { success: false, error: 'Email and password are required' },
+        { success: false, error: 'Username/Email and password are required' },
         { status: 400 }
       )
     }
 
-    const result = await loginUser(email, password)
+    // username parameter can be either username or email
+    const result = await loginUser(username, password)
 
     if (!result.success) {
       return NextResponse.json(
@@ -22,10 +23,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    return NextResponse.json(
+    // Set secure cookie
+    const response = NextResponse.json(
       { success: true, user: result.user },
       { status: 200 }
     )
+    
+    response.cookies.set('bfp_user', JSON.stringify(result.user), {
+      httpOnly: false, // Allow JS access for client-side routing
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: '/',
+    })
+
+    return response
   } catch (error: any) {
     console.error('Login API error:', error)
     return NextResponse.json(

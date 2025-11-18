@@ -9,11 +9,12 @@ datasource db {
 
 model User {
   id          Int            @id @default(autoincrement())
-  email       String         @unique
+  username    String         @unique
+  email       String?
   password    String
   name        String
   age         Int
-   role        UserRole       @default(guest)
+  role        UserRole       @default(guest)
   isActive    Boolean        @default(true)
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt

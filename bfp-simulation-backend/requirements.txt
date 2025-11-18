@@ -4,6 +4,7 @@ python-multipart
 torch
 torchvision
 stable-baselines3[extra]
+sb3-contrib
 gymnasium
 opencv-python-headless
 numpy

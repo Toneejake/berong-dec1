@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     const backendFormData = new FormData()
     backendFormData.append("file", file)
 
-    const response = await fetch(`${BACKEND_URL}/process-image`, {
+    const response = await fetch(`${BACKEND_URL}/api/process-image`, {
       method: "POST",
       body: backendFormData
     })

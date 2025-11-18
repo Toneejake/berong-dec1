@@ -10,6 +10,11 @@ import { GridVisualization } from "@/components/grid-visualization"
 import { ArrowLeft, Play, Loader2, Info } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
+// Configuration
+const PPO_VERSION = "500k_steps" // Options: "v1.5", "v2.0_lite", "500k_steps", "v2.0"
+const MAX_AGENTS = PPO_VERSION === "v1.5" ? 5 : 10
+const MAX_EXITS = PPO_VERSION === "v1.5" ? 40 : 248
+
 interface SimulationSetupProps {
   grid: number[][]
   config: {
@@ -86,7 +91,7 @@ export function SimulationSetup({
       agentPos.push(freeCells[idx])
     }
 
-    // Find perimeter cells for exits (PPO v1.5 constraint: 40 exits)
+    // Find perimeter cells for exits (PPO v2.0: up to 248 exits)
     const perimeterCells: [number, number][] = []
     for (let row = 0; row < grid.length; row++) {
       for (let col = 0; col < grid[row].length; col++) {
@@ -101,8 +106,8 @@ export function SimulationSetup({
       }
     }
 
-    // Sample 40 exits from perimeter
-    const exitCount = Math.min(40, perimeterCells.length)
+    // Sample exits from perimeter (up to MAX_EXITS)
+    const exitCount = Math.min(MAX_EXITS, perimeterCells.length)
     const exitPositions: [number, number][] = []
     const usedIndices = new Set<number>()
     
@@ -145,7 +150,7 @@ export function SimulationSetup({
         <Alert>
           <Info className="h-4 w-4" />
           <AlertDescription>
-            Using PPO Commander v1.5 with fixed action space (40 exits, up to 5 agents).
+            Using PPO Commander {PPO_VERSION} with variable action space (up to {MAX_EXITS} exits, up to {MAX_AGENTS} agents).
             Auto-generate will create optimal configurations automatically.
           </AlertDescription>
         </Alert>
@@ -159,12 +164,12 @@ export function SimulationSetup({
           <TabsContent value="auto" className="space-y-4">
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="numAgents">Number of Agents (1-5)</Label>
+                <Label htmlFor="numAgents">Number of Agents (1-{MAX_AGENTS})</Label>
                 <Input
                   id="numAgents"
                   type="number"
                   min={1}
-                  max={5}
+                  max={MAX_AGENTS}
                   value={config.numAgents}
                   onChange={(e) => onConfigUpdate({ numAgents: parseInt(e.target.value) || 1 })}
                 />
@@ -193,7 +198,7 @@ export function SimulationSetup({
                 variant={placementMode === "exit" ? "default" : "outline"}
                 onClick={() => setPlacementMode(placementMode === "exit" ? "none" : "exit")}
               >
-                Place Exits ({config.exits.length}/40)
+                Place Exits ({config.exits.length}/{MAX_EXITS})
               </Button>
             </div>
             <Button variant="destructive" onClick={handleClearAll} className="w-full">

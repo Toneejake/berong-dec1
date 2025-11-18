@@ -17,14 +17,14 @@ import Image from "next/image"
 
 export default function AuthPage() {
   const router = useRouter()
-  const { login, register, isAuthenticating } = useAuth()
+  const { login, register, isAuthenticating, getRedirectPath } = useAuth()
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [isLogin, setIsLogin] = useState(true)
 
-  const [loginData, setLoginData] = useState({ email: "", password: "" })
+  const [loginData, setLoginData] = useState({ username: "", password: "" })
   const [registerData, setRegisterData] = useState({
-    email: "",
+    username: "",
     password: "",
     confirmPassword: "",
     name: "",
@@ -36,10 +36,10 @@ export default function AuthPage() {
   const validateForm = () => {
     const errors: Record<string, string> = {}
 
-    if (!loginData.email) {
-      errors.email = "Email is required"
-    } else if (!/\S+@\S+\.\S+/.test(loginData.email)) {
-      errors.email = "Email is invalid"
+    if (!loginData.username) {
+      errors.username = "Username is required"
+    } else if (loginData.username.length < 3) {
+      errors.username = "Username must be at least 3 characters"
     }
 
     if (!loginData.password) {
@@ -51,6 +51,13 @@ export default function AuthPage() {
     if (!isLogin) {
       if (!registerData.name) {
         errors.name = "Name is required"
+      }
+      if (!registerData.username) {
+        errors.username = "Username is required"
+      } else if (registerData.username.length < 3 || registerData.username.length > 20) {
+        errors.username = "Username must be 3-20 characters"
+      } else if (!/^[a-zA-Z0-9_]+$/.test(registerData.username)) {
+        errors.username = "Username can only contain letters, numbers, and underscores"
       }
       if (!registerData.age) {
         errors.age = "Age is required"
@@ -69,15 +76,18 @@ export default function AuthPage() {
     setLoading(true)
 
     if (!validateForm()) {
+      setLoading(false)
       return
     }
 
-    const success = await login(loginData.email, loginData.password)
+    const result = await login(loginData.username, loginData.password)
 
-    if (success) {
-      router.push("/")
+    if (result.success) {
+      // Redirect based on user role
+      const redirectPath = getRedirectPath()
+      router.push(redirectPath)
     } else {
-      setError("Invalid email or password")
+      setError(result.error || "Invalid username or password")
     }
 
     setLoading(false)
@@ -99,17 +109,19 @@ export default function AuthPage() {
 
     setLoading(true)
 
-    const success = await register(
-      registerData.email,
+    const result = await register(
+      registerData.username,
       registerData.password,
       registerData.name,
       Number.parseInt(registerData.age),
     )
 
-    if (success) {
-      router.push("/")
+    if (result.success) {
+      // Redirect based on user role
+      const redirectPath = getRedirectPath()
+      router.push(redirectPath)
     } else {
-      setError("Email already exists or registration failed")
+      setError(result.error || "Registration failed. Username may already be taken.")
     }
 
     setLoading(false)
@@ -153,17 +165,18 @@ export default function AuthPage() {
               <TabsContent value="login">
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="login-email">Email</Label>
+                    <Label htmlFor="login-username">Username or Email</Label>
                     <Input
-                      id="login-email"
-                      type="email"
-                      placeholder="your.email@example.com"
-                      value={loginData.email}
-                      onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
+                      id="login-username"
+                      type="text"
+                      placeholder="your_username or email@example.com"
+                      value={loginData.username}
+                      onChange={(e) => setLoginData({ ...loginData, username: e.target.value })}
                       required
+                      autoComplete="username"
                     />
-                    {validationErrors.email && (
-                      <p className="mt-1 text-sm text-red-600">{validationErrors.email}</p>
+                    {validationErrors.username && (
+                      <p className="mt-1 text-sm text-red-600">{validationErrors.username}</p>
                     )}
                   </div>
                   <div className="space-y-2">
@@ -175,6 +188,7 @@ export default function AuthPage() {
                       value={loginData.password}
                       onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
                       required
+                      autoComplete="current-password"
                     />
                     {validationErrors.password && (
                       <p className="mt-1 text-sm text-red-600">{validationErrors.password}</p>
@@ -229,17 +243,18 @@ export default function AuthPage() {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="register-email">Email</Label>
+                    <Label htmlFor="register-username">Username</Label>
                     <Input
-                      id="register-email"
-                      type="email"
-                      placeholder="your.email@example.com"
-                      value={registerData.email}
-                      onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
+                      id="register-username"
+                      type="text"
+                      placeholder="your_username"
+                      value={registerData.username}
+                      onChange={(e) => setRegisterData({ ...registerData, username: e.target.value })}
                       required
+                      autoComplete="username"
                     />
-                    {validationErrors.email && (
-                      <p className="mt-1 text-sm text-red-600">{validationErrors.email}</p>
+                    {validationErrors.username && (
+                      <p className="mt-1 text-sm text-red-600">{validationErrors.username}</p>
                     )}
                   </div>
                   <div className="space-y-2">
@@ -251,6 +266,7 @@ export default function AuthPage() {
                       value={registerData.password}
                       onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
                       required
+                      autoComplete="new-password"
                     />
                     {validationErrors.password && (
                       <p className="mt-1 text-sm text-red-600">{validationErrors.password}</p>

@@ -4,10 +4,10 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:800
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { jobId: string } }
+  { params }: { params: Promise<{ jobId: string }> }
 ) {
   try {
-    const { jobId } = params
+    const { jobId } = await params
 
     if (!jobId) {
       return NextResponse.json(
@@ -17,7 +17,7 @@ export async function GET(
     }
 
     // Forward to Python backend
-    const response = await fetch(`${BACKEND_URL}/status/${jobId}`)
+    const response = await fetch(`${BACKEND_URL}/api/status/${jobId}`)
 
     if (!response.ok) {
       const errorText = await response.text()

@@ -170,11 +170,12 @@ class Person:
 
 # Gymnasium Environment
 class EvacuationEnv(gym.Env):
-    def __init__(self, grid, num_agents=5, max_steps=500, agent_start_positions=None, fire_start_position=None, exits=None):
+    def __init__(self, grid, num_agents=5, max_steps=500, agent_start_positions=None, fire_start_position=None, exits=None, max_agents=10):
         super(EvacuationEnv, self).__init__()
 
         self.base_grid = grid
         self.num_agents = num_agents
+        self.max_agents = max_agents  # For zero-padding observations
         self.max_steps = max_steps
         self.initial_agent_positions = agent_start_positions
         self.initial_fire_position = fire_start_position
@@ -189,9 +190,10 @@ class EvacuationEnv(gym.Env):
 
         self.action_space = spaces.Discrete(len(self.exits))
 
+        # Use max_agents for observation space (zero-padded)
         fire_obs_shape = 64 * 64
-        agent_pos_shape = self.num_agents * 2
-        agent_state_shape = self.num_agents * 1
+        agent_pos_shape = self.max_agents * 2
+        agent_state_shape = self.max_agents * 1
         obs_shape = fire_obs_shape + agent_pos_shape + agent_state_shape + 1
         self.observation_space = spaces.Box(low=0, high=1, shape=(obs_shape,), dtype=np.float32)
 
@@ -220,14 +222,22 @@ class EvacuationEnv(gym.Env):
         fire_map_resized = cv2.resize(self.fire_sim.fire_map.astype(np.float32), (64, 64), interpolation=cv2.INTER_AREA)
         fire_obs = fire_map_resized.flatten()
 
-        agent_pos_obs = np.array([agent.pos for agent in self.agents]).flatten() / np.array([self.base_grid.shape[1], self.base_grid.shape[0]] * self.num_agents)
+        # Agent positions: normalized and zero-padded to max_agents
+        agent_pos = np.array([agent.pos for agent in self.agents]).flatten() / np.array([self.base_grid.shape[1], self.base_grid.shape[0]] * self.num_agents)
+        agent_pos_obs = np.zeros(self.max_agents * 2, dtype=np.float32)
+        agent_pos_obs[:len(agent_pos)] = agent_pos
 
+        # Agent states: mapped to float values and zero-padded to max_agents
         state_map = {'CALM': 0.0, 'ALERT': 0.5, 'PANICKED': 1.0}
-        agent_state_obs = np.array([state_map.get(agent.state, 0.0) for agent in self.agents])
+        agent_states = np.array([state_map.get(agent.state, 0.0) for agent in self.agents])
+        agent_state_obs = np.zeros(self.max_agents, dtype=np.float32)
+        agent_state_obs[:len(agent_states)] = agent_states
 
         time_obs = np.array([self.current_step / self.max_steps])
 
-        return np.concatenate([fire_obs, agent_pos_obs, agent_state_obs, time_obs]).astype(np.float32)
+        obs = np.concatenate([fire_obs, agent_pos_obs, agent_state_obs, time_obs]).astype(np.float32)
+        print(f"[DEBUG] Observation shape: {obs.shape}, num_agents: {self.num_agents}, max_agents: {self.max_agents}")
+        return obs
 
     def reset(self, seed=None):
         super().reset(seed=seed)
