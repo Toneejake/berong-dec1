@@ -6,6 +6,14 @@ import cv2
 
 # A* Pathfinding Algorithm
 def a_star_search(grid, start, goal, fire_map=None):
+    # Debug: Check if start/goal are valid
+    if grid[start[1]][start[0]] == 1:
+        print(f"[DEBUG] A* Failed: Start {start} is in WALL", flush=True)
+        return []
+    if grid[goal[1]][goal[0]] == 1:
+        print(f"[DEBUG] A* Failed: Goal {goal} is in WALL", flush=True)
+        return []
+        
     def heuristic(a, b):
         return abs(a[0] - b[0]) + abs(a[1] - b[1])
     
@@ -44,6 +52,8 @@ def a_star_search(grid, start, goal, fire_map=None):
                 gscore[neighbor] = tentative_g_score
                 fscore[neighbor] = tentative_g_score + heuristic(neighbor, goal)
                 heapq.heappush(oheap, (fscore[neighbor], neighbor))
+    
+    print(f"[DEBUG] A* Failed: No path found from {start} to {goal}", flush=True)
     return []
 
 
@@ -103,6 +113,143 @@ class Person:
         self.tripped_timer = 0
         self.PANIC_DISTANCE = 25
         self.ALERT_DISTANCE = 50
+        self.escape_time = None
+        self.steps_taken = 0
+
+    def update_state(self, fire_map):
+        if self.tripped_timer > 0:
+            return
+        fire_locations = np.argwhere(fire_map == 1)
+        if len(fire_locations) == 0:
+            min_dist = float('inf')
+        else:
+            agent_pos_yx = np.array([self.pos[1], self.pos[0]])
+            min_dist = np.min(np.linalg.norm(fire_locations - agent_pos_yx, axis=1))
+
+        if min_dist < self.PANIC_DISTANCE:
+            self.state = 'PANICKED'
+            self.speed = 1.5
+            self.trip_probability = 0.1
+        elif min_dist < self.ALERT_DISTANCE:
+            self.state = 'ALERT'
+            self.speed = 1.2
+import heapq
+import numpy as np
+import gymnasium as gym
+from gymnasium import spaces
+import cv2
+
+# A* Pathfinding Algorithm
+def a_star_search(grid, start, goal, fire_map=None):
+    # Debug: Check if start/goal are valid
+    if grid[start[1]][start[0]] == 1:
+        print(f"[DEBUG] A* Failed: Start {start} is in WALL", flush=True)
+        return []
+    if grid[goal[1]][goal[0]] == 1:
+        print(f"[DEBUG] A* Failed: Goal {goal} is in WALL", flush=True)
+        return []
+        
+    def heuristic(a, b):
+        return abs(a[0] - b[0]) + abs(a[1] - b[1])
+    
+    neighbors = [(0, 1), (0, -1), (1, 0), (-1, 0)]
+    close_set = set()
+    came_from = {}
+    gscore = {start: 0}
+    fscore = {start: heuristic(start, goal)}
+    oheap = []
+    heapq.heappush(oheap, (fscore[start], start))
+    
+    while oheap:
+        current = heapq.heappop(oheap)[1]
+        if current == goal:
+            data = []
+            while current in came_from:
+                data.append(current)
+                current = came_from[current]
+            data.reverse()
+            return data
+        close_set.add(current)
+        for i, j in neighbors:
+            neighbor = current[0] + i, current[1] + j
+            tentative_g_score = gscore[current] + 1
+            if 0 <= neighbor[0] < grid.shape[1] and 0 <= neighbor[1] < grid.shape[0]:
+                if grid[neighbor[1]][neighbor[0]] == 1:
+                    continue
+                if fire_map is not None and fire_map[neighbor[1]][neighbor[0]] == 1:
+                    continue
+            else:
+                continue
+            if neighbor in close_set and tentative_g_score >= gscore.get(neighbor, 0):
+                continue
+            if tentative_g_score < gscore.get(neighbor, 0) or neighbor not in [i[1] for i in oheap]:
+                came_from[neighbor] = current
+                gscore[neighbor] = tentative_g_score
+                fscore[neighbor] = tentative_g_score + heuristic(neighbor, goal)
+                heapq.heappush(oheap, (fscore[neighbor], neighbor))
+    
+    print(f"[DEBUG] A* Failed: No path found from {start} to {goal}", flush=True)
+    return []
+
+
+# Fire Simulator Class
+class FireSimulator:
+    def __init__(self, grid, spread_probability=0.25, firewall_spread_factor=0.1):
+        self.base_grid = grid
+        self.spread_probability = spread_probability
+        self.firewall_spread_factor = firewall_spread_factor
+        self.fire_map = np.zeros_like(self.base_grid, dtype=float)
+        self.directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
+
+    def start_fire(self, ignition_points):
+        for y, x in ignition_points:
+            if 0 <= y < self.fire_map.shape[0] and 0 <= x < self.fire_map.shape[1]:
+                self.fire_map[y, x] = 1
+
+    def step(self):
+        new_fire_map = self.fire_map.copy()
+        rows, cols = self.fire_map.shape
+        burning_cells = np.argwhere(self.fire_map == 1)
+
+        for r, c in burning_cells:
+            for dr, dc in self.directions:
+                nr, nc = r + dr, c + dc
+
+                if 0 <= nr < rows and 0 <= nc < cols:
+                    if self.fire_map[nr, nc] == 0:
+                        neighbor_type = self.base_grid[nr, nc]
+
+                        current_spread_prob = self.spread_probability
+                        if neighbor_type == 1:
+                            current_spread_prob = 0
+                        elif neighbor_type == 2:
+                            current_spread_prob *= self.firewall_spread_factor
+
+                        if np.random.rand() < current_spread_prob:
+                            new_fire_map[nr, nc] = 1
+
+        self.fire_map = new_fire_map
+
+    def reset(self, ignition_points=None):
+        self.fire_map = np.zeros_like(self.base_grid, dtype=float)
+        if ignition_points:
+            self.start_fire(ignition_points)
+
+# Person Agent Class
+class Person:
+    def __init__(self, position):
+        self.initial_pos = tuple(position)
+        self.pos = list(position)
+        self.path = []
+        self.status = 'evacuating'
+        self.state = 'CALM'
+        self.speed = 1.0
+        self.trip_probability = 0.0
+        self.tripped_timer = 0
+        self.PANIC_DISTANCE = 25
+        self.ALERT_DISTANCE = 50
+        self.escape_time = None
+        self.steps_taken = 0
 
     def update_state(self, fire_map):
         if self.tripped_timer > 0:
@@ -127,7 +274,7 @@ class Person:
             self.speed = 1.0
             self.trip_probability = 0.0
 
-    def move(self):
+    def move(self, grid):
         if self.tripped_timer > 0:
             self.tripped_timer -= 1
             return
@@ -138,26 +285,44 @@ class Person:
         steps_to_move = int(round(self.speed))
         for _ in range(steps_to_move):
             if self.path:
+                next_pos = self.path[0]
+                # Check for wall collision before moving
+                if grid[next_pos[1]][next_pos[0]] == 1:
+                    print(f"[DEBUG] Agent blocked by wall at {next_pos}", flush=True)
+                    self.path = [] # Clear invalid path
+                    break
+                
                 self.pos = self.path.pop(0)
+                self.steps_taken += 1
             else:
                 break
 
     def check_status(self, fire_map, exits):
         if self.status != 'evacuating':
             return
-        pos_int = (int(self.pos[1]), int(self.pos[0]))
-        if fire_map[pos_int[0], pos_int[1]] == 1:
-            self.status = 'burned'
-            return
+        # Fix: Use correct coordinate order (x, y)
+        pos_int = (int(self.pos[0]), int(self.pos[1]))
+        # Check bounds before accessing fire_map
+        if 0 <= pos_int[1] < fire_map.shape[0] and 0 <= pos_int[0] < fire_map.shape[1]:
+            if fire_map[pos_int[1], pos_int[0]] == 1:
+                self.status = 'burned'
+                return
+        # Fix: Increase exit detection radius from 5 to 10 pixels
         for ex in exits:
-            if np.linalg.norm(np.array(self.pos) - np.array(ex)) < 5:
+            if np.linalg.norm(np.array(self.pos) - np.array(ex)) < 10:
                 self.status = 'escaped'
+                self.escape_time = self.steps_taken
                 return
 
     def compute_path(self, grid, goal, fire_map):
         start_pos = (int(self.pos[0]), int(self.pos[1]))
         goal_pos = (int(goal[0]), int(goal[1]))
+        # Debug: Log path computation
+        # print(f"[DEBUG] Computing path from {start_pos} to {goal_pos}", flush=True)
         self.path = a_star_search(grid, start_pos, goal_pos, fire_map)
+        if not self.path:
+            # print(f"[DEBUG] No path found for agent at {start_pos} to {goal_pos}", flush=True)
+            pass
 
     def reset(self):
         self.pos = list(self.initial_pos)
@@ -167,6 +332,8 @@ class Person:
         self.speed = 1.0
         self.trip_probability = 0.0
         self.tripped_timer = 0
+        self.escape_time = None
+        self.steps_taken = 0
 
 # Gymnasium Environment
 class EvacuationEnv(gym.Env):
@@ -184,6 +351,10 @@ class EvacuationEnv(gym.Env):
         self.exits = self._find_exits() if self.initial_exits is None else self.initial_exits
         if not self.exits:
             raise ValueError("No exits were found or provided. Cannot create environment.")
+
+        # Debug: Check grid composition
+        unique, counts = np.unique(self.base_grid, return_counts=True)
+        print(f"[DEBUG] Grid composition: {dict(zip(unique, counts))}", flush=True)
 
         self.fire_sim = FireSimulator(self.base_grid)
         self.agents = []
@@ -236,7 +407,7 @@ class EvacuationEnv(gym.Env):
         time_obs = np.array([self.current_step / self.max_steps])
 
         obs = np.concatenate([fire_obs, agent_pos_obs, agent_state_obs, time_obs]).astype(np.float32)
-        print(f"[DEBUG] Observation shape: {obs.shape}, num_agents: {self.num_agents}, max_agents: {self.max_agents}")
+        # print(f"[DEBUG] Observation shape: {obs.shape}, num_agents: {self.num_agents}, max_agents: {self.max_agents}")
         return obs
 
     def reset(self, seed=None):
@@ -277,12 +448,22 @@ class EvacuationEnv(gym.Env):
                 if agent.state != 'PANICKED' and is_stuck_or_needs_path:
                     agent.compute_path(self.base_grid, target_exit, self.fire_sim.fire_map)
 
-                agent.move()
-                agent.check_status(self.fire_sim.fire_map, self.exits)
+                agent.move(self.base_grid)
+                
+                # Debug: Check for wall collision
+                pos_y, pos_x = int(agent.pos[1]), int(agent.pos[0])
+                if 0 <= pos_y < self.base_grid.shape[0] and 0 <= pos_x < self.base_grid.shape[1]:
+                    if self.base_grid[pos_y, pos_x] == 1:
+                        print(f"[CRITICAL] Agent moved into WALL at {agent.pos}!", flush=True)
 
+                agent.check_status(self.fire_sim.fire_map, self.exits)
+                
+                # Debug: Log status changes
                 if agent.status == 'escaped':
+                    print(f"[DEBUG] Agent at {agent.pos} ESCAPED at step {self.current_step}, took {agent.steps_taken} steps", flush=True)
                     reward += 10
                 elif agent.status == 'burned':
+                    print(f"[DEBUG] Agent at {agent.pos} BURNED at step {self.current_step}", flush=True)
                     reward -= 10
 
         terminated = all(agent.status != 'evacuating' for agent in self.agents)

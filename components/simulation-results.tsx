@@ -1,9 +1,9 @@
-﻿"use client"
-
+﻿import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle2, XCircle, RotateCcw, Clock, Users, Flame } from "lucide-react"
+import { Slider } from "@/components/ui/slider"
+import { CheckCircle2, XCircle, RotateCcw, Clock, Users, Flame, Play, Pause, SkipBack, SkipForward } from "lucide-react"
 import { GridVisualization } from "@/components/grid-visualization"
 
 interface SimulationResultsProps {
@@ -19,16 +19,156 @@ interface SimulationResultsProps {
       path_length: number
     }>
     commander_actions?: number[]
+    animation_data?: {
+      history: Array<{
+        step: number
+        agents: Array<{
+          pos: [number, number]
+          status: string
+          state: string
+          tripped: boolean
+        }>
+        fire_map: number[][]
+        exits: [number, number][]
+      }>
+    }
   }
+  grid: number[][]
   onReset: () => void
 }
 
-export function SimulationResults({ results, onReset }: SimulationResultsProps) {
+export function SimulationResults({ results, grid, onReset }: SimulationResultsProps) {
   const successRate = (results.escaped_count / results.total_agents) * 100
   const isSuccess = results.escaped_count === results.total_agents
 
+  // Animation State
+  const [currentStep, setCurrentStep] = useState(0)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [playbackSpeed, setPlaybackSpeed] = useState(100) // ms per frame
+  const animationRef = useRef<NodeJS.Timeout | null>(null)
+
+  const history = results.animation_data?.history || []
+  const maxSteps = history.length - 1
+
+  // Playback Logic
+  useEffect(() => {
+    if (isPlaying) {
+      animationRef.current = setInterval(() => {
+        setCurrentStep(prev => {
+          if (prev >= maxSteps) {
+            setIsPlaying(false)
+            return prev
+          }
+          return prev + 1
+        })
+      }, playbackSpeed)
+    } else {
+      if (animationRef.current) {
+        clearInterval(animationRef.current)
+      }
+    }
+
+    return () => {
+      if (animationRef.current) {
+        clearInterval(animationRef.current)
+      }
+    }
+  }, [isPlaying, maxSteps, playbackSpeed])
+
+  const togglePlay = () => setIsPlaying(!isPlaying)
+  const resetAnimation = () => {
+    setIsPlaying(false)
+    setCurrentStep(0)
+  }
+
+  // Get current frame data
+  const currentFrame = history[currentStep] || {
+    agents: [],
+    fire_map: [],
+    exits: []
+  }
+
+  // Construct dynamic grid for visualization
+  // We need to merge the base grid (walls) with the fire map
+  const displayGrid = grid.map((row, r) =>
+    row.map((cell, c) => {
+      // If fire map has fire (1) at this position, treat as fire
+      // Note: fire_map might be smaller or different structure, need to be careful
+      // The backend returns fire_map as a full grid
+      if (currentFrame.fire_map && currentFrame.fire_map[r] && currentFrame.fire_map[r][c] === 1) {
+        return 2 // 2 = Fire (we need to handle this in GridVisualization if it supports it, or pass firePosition)
+      }
+      return cell
+    })
+  )
+
   return (
     <div className="space-y-6">
+      {/* Animation Player */}
+      {history.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex justify-between items-center">
+              <span>Replay Simulation</span>
+              <Badge variant="outline">Step {currentStep} / {maxSteps}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col items-center space-y-4">
+              {/* Visualization */}
+              <div className="border rounded-lg p-2 bg-white">
+                <GridVisualization
+                  grid={grid} // Base grid (walls)
+                  agentPositions={currentFrame.agents ? currentFrame.agents.map((a: any) => a.pos) : []}
+                  exits={[]} // Exits are static in base grid or we can pass them if needed
+                  fireMap={currentFrame.fire_map}
+                  firePosition={null}
+                />
+              </div>
+
+              {/* Controls */}
+              <div className="w-full max-w-md space-y-4">
+                <div className="flex items-center justify-center gap-4">
+                  <Button variant="outline" size="icon" onClick={resetAnimation}>
+                    <SkipBack className="h-4 w-4" />
+                  </Button>
+                  <Button onClick={togglePlay} size="lg">
+                    {isPlaying ? <Pause className="h-4 w-4 mr-2" /> : <Play className="h-4 w-4 mr-2" />}
+                    {isPlaying ? "Pause" : "Play"}
+                  </Button>
+                  <Button variant="outline" size="icon" onClick={() => setCurrentStep(maxSteps)}>
+                    <SkipForward className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-muted-foreground">Speed:</span>
+                  <Slider
+                    value={[200 - playbackSpeed]}
+                    min={0}
+                    max={190}
+                    step={10}
+                    onValueChange={(vals) => setPlaybackSpeed(200 - vals[0])}
+                    className="flex-1"
+                  />
+                </div>
+
+                <Slider
+                  value={[currentStep]}
+                  min={0}
+                  max={maxSteps}
+                  step={1}
+                  onValueChange={(vals) => {
+                    setIsPlaying(false)
+                    setCurrentStep(vals[0])
+                  }}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Summary Card */}
       <Card className={isSuccess ? "border-green-500 border-2" : ""}>
         <CardHeader>
@@ -48,9 +188,11 @@ export function SimulationResults({ results, onReset }: SimulationResultsProps) 
                   : "Some agents did not survive the evacuation"}
               </CardDescription>
             </div>
-            <Badge variant={isSuccess ? "default" : "destructive"} className="text-lg px-4 py-2">
-              {successRate.toFixed(1)}% Success
-            </Badge>
+            <div className="flex flex-col items-end gap-2">
+              <Badge variant={isSuccess ? "default" : "destructive"} className="text-lg px-4 py-2">
+                {successRate.toFixed(1)}% Success
+              </Badge>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

@@ -2,10 +2,12 @@
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Tuple, Dict, Any, Optional
+from contextlib import asynccontextmanager
 import uuid
 import torch
 import numpy as np
 import os
+import sys
 import tempfile
 import sqlite3
 import json
@@ -31,8 +33,161 @@ from simulation import EvacuationEnv
 PPO_MODEL_VERSION = "500k_steps"  # Options: "v1.5", "v2.0_lite", "500k_steps", "v2.0"
 USE_MASKABLE_PPO = True  # Set to True for v2.0, False for v1.5
 
-# Initialize FastAPI app
-app = FastAPI(title="Fire Evacuation Simulation API", version="1.0.0")
+# Global variables for models
+unet_model = None
+ppo_model = None
+device = None
+IMAGE_SIZE = 256
+
+# Chatbot global variables
+chatbot_model = None
+words = None
+classes = None
+intents = None
+lemmatizer = None
+
+# Lifespan event handler (replaces deprecated on_event)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    global unet_model, ppo_model, device, chatbot_model, words, classes, intents, lemmatizer
+    
+    print("\n" + "=" * 60)
+    print("FIRE EVACUATION SIMULATION BACKEND - STARTING UP")
+    print("=" * 60)
+    print(f"Working directory: {os.getcwd()}")
+    print(f"Python version: {sys.version}")
+    print("=" * 60)
+    
+    device = torch.device("cpu")
+    print(f"\nUsing device: {device}")
+    
+    # Load U-Net model with error handling
+    print("\n[1/3] Loading U-Net Floor Plan Segmentation Model...")
+    try:
+        model_path = "models/unet_floorplan_model.pth"
+        abs_path = os.path.abspath(model_path)
+        print(f"  Model path: {abs_path}")
+        
+        if not os.path.exists(model_path):
+            print(f"  [FAIL] ERROR: Model file not found!")
+            print(f"  Expected location: {abs_path}")
+            print(f"  Please ensure the model file exists at this location.")
+            unet_model = None
+        else:
+            file_size = os.path.getsize(model_path) / (1024 * 1024)  # MB
+            print(f"  File size: {file_size:.2f} MB")
+            print(f"  Loading model...")
+            
+            unet_model = UNet()
+            unet_model.load_state_dict(torch.load(model_path, map_location=device))
+            unet_model.to(device)
+            unet_model.eval()
+            print(f"  [OK] U-Net model loaded successfully")
+    except Exception as e:
+        print(f"  [FAIL] ERROR loading U-Net model:")
+        print(f"  {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        unet_model = None
+    
+    # Load PPO model with error handling
+    print(f"\n[2/3] Loading PPO Commander Model ({PPO_MODEL_VERSION})...")
+    try:
+        model_path = f"models/ppo_commander_{PPO_MODEL_VERSION}.zip"
+        abs_path = os.path.abspath(model_path)
+        print(f"  Model path: {abs_path}")
+        print(f"  Using {'MaskablePPO' if USE_MASKABLE_PPO else 'Standard PPO'}")
+        
+        if not os.path.exists(model_path):
+            print(f"  [FAIL] ERROR: Model file not found!")
+            print(f"  Expected location: {abs_path}")
+            ppo_model = None
+        else:
+            file_size = os.path.getsize(model_path) / (1024 * 1024)  # MB
+            print(f"  File size: {file_size:.2f} MB")
+            print(f"  Loading model...")
+            
+            if USE_MASKABLE_PPO:
+                ppo_model = MaskablePPO.load(model_path, device=device)
+            else:
+                ppo_model = PPO.load(model_path, device=device)
+            print(f"  [OK] PPO Commander {PPO_MODEL_VERSION} loaded successfully")
+    except Exception as e:
+        print(f"  [FAIL] ERROR loading PPO model:")
+        print(f"  {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        ppo_model = None
+    
+    # Load Chatbot model (optional)
+    print("\n[3/3] Loading Fire Safety Chatbot Model...")
+    try:
+        # Download required NLTK data if not already present
+        try:
+            nltk.data.find('tokenizers/punkt')
+        except LookupError:
+            print("  Downloading NLTK punkt tokenizer...")
+            nltk.download('punkt')
+
+        try:
+            nltk.data.find('corpora/wordnet')
+        except LookupError:
+            print("  Downloading NLTK wordnet...")
+            nltk.download('wordnet')
+
+        try:
+            nltk.data.find('corpora/omw-1.4')
+        except LookupError:
+            print("  Downloading NLTK omw-1.4...")
+            nltk.download('omw-1.4')
+
+        # Initialize lemmatizer
+        lemmatizer = WordNetLemmatizer()
+
+        # Load the model and data files
+        chatbot_model = load_model('Fire Safety Chatbot/chatbot_model.h5')
+        words = pickle.load(open('Fire Safety Chatbot/words.pkl', 'rb'))
+        classes = pickle.load(open('Fire Safety Chatbot/classes.pkl', 'rb'))
+        intents = json.load(open('Fire Safety Chatbot/intents.json', 'rb'))
+        print("  [OK] Chatbot model loaded successfully")
+    except Exception as e:
+        print(f"  [WARN] WARNING: Chatbot failed to load:")
+        print(f"  {type(e).__name__}: {str(e)}")
+        print(f"  Chatbot will not be available, but simulation will work.")
+        chatbot_model = None
+    
+    # Print summary
+    print("\n" + "=" * 60)
+    print("STARTUP SUMMARY:")
+    print("=" * 60)
+    print(f"  U-Net Model:     {'[OK] Loaded' if unet_model else '[FAIL] FAILED'}")
+    print(f"  PPO Model:       {'[OK] Loaded' if ppo_model else '[FAIL] FAILED'}")
+    print(f"  Chatbot:         {'[OK] Loaded' if chatbot_model else '[WARN] Not Available'}")
+    print("=" * 60)
+    
+    if not unet_model or not ppo_model:
+        print("\n[WARN] CRITICAL WARNING: Essential models failed to load!")
+        print("The simulation WILL NOT WORK without U-Net and PPO models.")
+        print("Please check the errors above and ensure model files exist.")
+        print("\nExpected model locations:")
+        print(f"  - {os.path.abspath('models/unet_floorplan_model.pth')}")
+        print(f"  - {os.path.abspath(f'models/ppo_commander_{PPO_MODEL_VERSION}.zip')}")
+    else:
+        print("\n[OK] All critical models loaded successfully!")
+        print("Backend is ready to process fire evacuation simulations.")
+    
+    print("\nServer is now listening on http://0.0.0.0:8000")
+    print("API documentation available at http://localhost:8000/docs")
+    print("=" * 60 + "\n")
+    
+    yield  # Server runs here
+    
+    # Shutdown (cleanup if needed)
+    print("\nShutting down backend...")
+
+# Initialize FastAPI app with lifespan
+app = FastAPI(title="Fire Evacuation Simulation API", version="1.0.0", lifespan=lifespan)
 
 # CORS Configuration
 app.add_middleware(
@@ -265,66 +420,6 @@ def auto_detect_exits(grid: np.ndarray, max_exits: int = 248) -> List[Tuple[int,
     
     return exits[:max_exits]
 
-# Startup event - Load models
-@app.on_event("startup")
-async def load_models():
-    global unet_model, ppo_model, device, chatbot_model, words, classes, intents, lemmatizer
-    
-    print("Loading AI models...")
-    device = torch.device("cpu")
-    
-    # Load U-Net model
-    print("Loading U-Net model...")
-    unet_model = UNet()
-    unet_model.load_state_dict(torch.load("models/unet_floorplan_model.pth", map_location=device))
-    unet_model.to(device)
-    unet_model.eval()
-    print("U-Net model loaded successfully")
-    
-    # Load PPO model
-    print(f"Loading PPO Commander model ({PPO_MODEL_VERSION})...")
-    model_path = f"models/ppo_commander_{PPO_MODEL_VERSION}.zip"
-    
-    if USE_MASKABLE_PPO:
-        ppo_model = MaskablePPO.load(model_path, device=device)
-        print(f"MaskablePPO Commander {PPO_MODEL_VERSION} loaded successfully")
-    else:
-        ppo_model = PPO.load(model_path, device=device)
-        print(f"PPO Commander {PPO_MODEL_VERSION} loaded successfully")
-    
-    # Load Chatbot model
-    print("Loading Chatbot model...")
-    try:
-        # Download required NLTK data if not already present
-        try:
-            nltk.data.find('tokenizers/punkt')
-        except LookupError:
-            nltk.download('punkt')
-
-        try:
-            nltk.data.find('corpora/wordnet')
-        except LookupError:
-            nltk.download('wordnet')
-
-        try:
-            nltk.data.find('corpora/omw-1.4')
-        except LookupError:
-            nltk.download('omw-1.4')
-
-        # Initialize lemmatizer
-        lemmatizer = WordNetLemmatizer()
-
-        # Load the model and data files
-        chatbot_model = load_model('Fire Safety Chatbot/chatbot_model.h5')
-        words = pickle.load(open('Fire Safety Chatbot/words.pkl', 'rb'))
-        classes = pickle.load(open('Fire Safety Chatbot/classes.pkl', 'rb'))
-        intents = json.load(open('Fire Safety Chatbot/intents.json', 'rb'))
-        print("Chatbot model loaded successfully")
-    except Exception as e:
-        print(f"Error loading chatbot model: {str(e)}")
-        print("Chatbot will not be available")
-    
-    print("All models loaded and ready!")
 
 
 # API Endpoints
@@ -359,6 +454,13 @@ async def get_chatbot_response(request: ChatbotRequest):
 @app.post("/api/process-image")
 async def process_image(file: UploadFile = File(...)):
     """Process uploaded floor plan image and return grid with original image"""
+    # Check if U-Net model is loaded
+    if unet_model is None:
+        raise HTTPException(
+            status_code=503,
+            detail="U-Net model not loaded. The backend started but model loading failed. Please check server logs and restart the backend."
+        )
+    
     try:
         # Save uploaded file to temporary location
         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_file:
@@ -408,7 +510,7 @@ def run_simulation_task(job_id: str, config: SimulationConfig):
         # Distribute user exits to 248 model exits
         if config.exits and len(config.exits) > 0:
             distributed_exits = distribute_exits_to_model(config.exits, grid, total_model_exits=248)
-            print(f"[JOB {job_id[:8]}] Distributed {len(config.exits)} user exits → 248 model exits", flush=True)
+            print(f"[JOB {job_id[:8]}] Distributed {len(config.exits)} user exits -> 248 model exits", flush=True)
         else:
             distributed_exits = auto_detect_exits(grid, max_exits=248)
             print(f"[JOB {job_id[:8]}] Auto-detected {len(distributed_exits)} exits from grid boundaries", flush=True)
@@ -480,13 +582,24 @@ def run_simulation_task(job_id: str, config: SimulationConfig):
         
         print(f"[JOB {job_id[:8]}] Simulation complete at step {step_count}: {escaped}/{total_agents} escaped, {burned} burned", flush=True)
         
-        # Prepare result
+        # Prepare agent results with detailed information
+        agent_results = []
+        for i, agent in enumerate(env.agents):
+            agent_results.append({
+                "agent_id": i,
+                "status": agent.status,
+                "exit_time": agent.escape_time if hasattr(agent, 'escape_time') and agent.status == "escaped" else None,
+                "path_length": agent.steps_taken if hasattr(agent, 'steps_taken') else step_count
+            })
+        
+        # Prepare result with correct structure for frontend
         result = {
-            "dashboard": {
-                "total_agents": total_agents,
-                "escaped": escaped,
-                "burned": burned
-            },
+            "total_agents": total_agents,
+            "escaped_count": escaped,
+            "burned_count": burned,
+            "time_steps": step_count,
+            "agent_results": agent_results,
+            "commander_actions": history[:100] if history else [],  # Limit to first 100 actions
             "animation_data": {
                 "history": history
             }
@@ -532,4 +645,10 @@ async def get_status(job_id: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(
+        app, 
+        host="0.0.0.0", 
+        port=8000,
+        log_level="info",
+        access_log=True
+    )

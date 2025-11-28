@@ -49,6 +49,6 @@ def create_grid_from_image(model, image_path, image_size, device):
     # So we INVERT: model output 1 (bright) -> keep as 1 (wall) ✓
     # But if rooms are being treated as walls, the model learned backwards
     # So we invert: 1 -> 0 (free), 0 -> 1 (wall)
-    grid_numpy = 1 - grid_numpy
+    # grid_numpy = 1 - grid_numpy
     
     return grid_numpy

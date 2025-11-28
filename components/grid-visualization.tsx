@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card"
 interface GridVisualizationProps {
   grid: number[][]
   firePosition?: [number, number] | null
+  fireMap?: [number, number][] // Array of fire coordinates
   agentPositions?: [number, number][]
   exits?: [number, number][]
   onCellClick?: (row: number, col: number) => void
@@ -15,6 +16,7 @@ interface GridVisualizationProps {
 export function GridVisualization({
   grid,
   firePosition,
+  fireMap = [],
   agentPositions = [],
   exits = [],
   onCellClick,
@@ -39,8 +41,12 @@ export function GridVisualization({
     // Draw grid
     for (let row = 0; row < grid.length; row++) {
       for (let col = 0; col < grid[row].length; col++) {
-        const isWall = grid[row][col] === 0
-        const isFire = firePosition && firePosition[0] === row && firePosition[1] === col
+        const isWall = grid[row][col] === 1
+        // Check for fire in both single position and fire map
+        const isFireOrigin = firePosition && firePosition[0] === row && firePosition[1] === col
+        const isFireSpread = fireMap.some(([r, c]) => r === row && c === col)
+        const isFire = isFireOrigin || isFireSpread
+
         const isAgent = agentPositions.some(([r, c]) => r === row && c === col)
         const isExit = exits.some(([r, c]) => r === row && c === col)
         const isHovered = hoveredCell && hoveredCell[0] === row && hoveredCell[1] === col
@@ -80,7 +86,7 @@ export function GridVisualization({
         ctx.stroke()
       }
     }
-  }, [grid, firePosition, agentPositions, exits, hoveredCell, canvasSize, cellSize, interactive])
+  }, [grid, firePosition, fireMap, agentPositions, exits, hoveredCell, canvasSize, cellSize, interactive])
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!interactive || !onCellClick) return
@@ -124,8 +130,8 @@ export function GridVisualization({
     setHoveredCell(null)
   }
 
-  const wallCount = grid.flat().filter(cell => cell === 0).length
-  const freeCount = grid.flat().filter(cell => cell === 1).length
+  const wallCount = grid.flat().filter(cell => cell === 1).length
+  const freeCount = grid.flat().filter(cell => cell === 0).length
 
   return (
     <div className="space-y-4">
@@ -165,10 +171,10 @@ export function GridVisualization({
             <span>Agents: {agentPositions.length}</span>
           </div>
         )}
-        {firePosition && (
+        {(firePosition || fireMap.length > 0) && (
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-red-500 border border-border"></div>
-            <span>Fire Origin</span>
+            <span>Fire</span>
           </div>
         )}
       </div>

@@ -41,10 +41,23 @@ export async function POST(request: NextRequest) {
     })
 
     if (!response.ok) {
-      const errorText = await response.text()
-      console.error("Backend error:", errorText)
+      // Try to extract detailed error message from backend
+      let errorMessage = "Failed to process image"
+      try {
+        const errorData = await response.json()
+        errorMessage = errorData.detail || errorData.error || errorMessage
+      } catch {
+        // If JSON parsing fails, try to get text
+        try {
+          const errorText = await response.text()
+          if (errorText) errorMessage = errorText
+        } catch {
+          // Keep default message
+        }
+      }
+      console.error("Backend error:", errorMessage)
       return NextResponse.json(
-        { error: "Failed to process image" },
+        { error: errorMessage },
         { status: response.status }
       )
     }
@@ -53,8 +66,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result)
   } catch (error) {
     console.error("Process image error:", error)
+
+    // Check if it's a network error (backend offline)
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      return NextResponse.json(
+        { error: `Cannot connect to AI backend at ${BACKEND_URL}. Please ensure the Python server is running and models are loaded.` },
+        { status: 503 }
+      )
+    }
+
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: error instanceof Error ? error.message : "Internal server error" },
       { status: 500 }
     )
   }

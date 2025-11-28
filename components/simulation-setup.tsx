@@ -10,10 +10,10 @@ import { GridVisualization } from "@/components/grid-visualization"
 import { ArrowLeft, Play, Loader2, Info } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-// Configuration
-const PPO_VERSION = "500k_steps" // Options: "v1.5", "v2.0_lite", "500k_steps", "v2.0"
-const MAX_AGENTS = PPO_VERSION === "v1.5" ? 5 : 10
-const MAX_EXITS = PPO_VERSION === "v1.5" ? 40 : 248
+type PPOVersion = "v1.5" | "v2.0_lite" | "500k_steps" | "v2.0"
+const PPO_VERSION: PPOVersion = "500k_steps"
+const MAX_AGENTS = (PPO_VERSION as string) === "v1.5" ? 5 : 10
+const MAX_EXITS = (PPO_VERSION as string) === "v1.5" ? 40 : 248
 
 interface SimulationSetupProps {
   grid: number[][]
@@ -44,7 +44,7 @@ export function SimulationSetup({
 
   const handleCellClick = (row: number, col: number) => {
     // Check if cell is valid (not a wall)
-    if (grid[row][col] === 0) {
+    if (grid[row][col] === 1) {
       alert("Cannot place items on walls!")
       return
     }
@@ -69,7 +69,7 @@ export function SimulationSetup({
     const freeCells: [number, number][] = []
     for (let row = 0; row < grid.length; row++) {
       for (let col = 0; col < grid[row].length; col++) {
-        if (grid[row][col] === 1) {
+        if (grid[row][col] === 0) {
           freeCells.push([row, col])
         }
       }
@@ -95,9 +95,9 @@ export function SimulationSetup({
     const perimeterCells: [number, number][] = []
     for (let row = 0; row < grid.length; row++) {
       for (let col = 0; col < grid[row].length; col++) {
-        if (grid[row][col] === 1) {
-          const isPerimeter = 
-            row === 0 || row === grid.length - 1 || 
+        if (grid[row][col] === 0) {
+          const isPerimeter =
+            row === 0 || row === grid.length - 1 ||
             col === 0 || col === grid[row].length - 1
           if (isPerimeter) {
             perimeterCells.push([row, col])
@@ -110,7 +110,7 @@ export function SimulationSetup({
     const exitCount = Math.min(MAX_EXITS, perimeterCells.length)
     const exitPositions: [number, number][] = []
     const usedIndices = new Set<number>()
-    
+
     while (exitPositions.length < exitCount && usedIndices.size < perimeterCells.length) {
       const idx = Math.floor(Math.random() * perimeterCells.length)
       if (!usedIndices.has(idx)) {
@@ -134,8 +134,8 @@ export function SimulationSetup({
     })
   }
 
-  const canRunSimulation = 
-    config.firePosition !== null && 
+  const canRunSimulation =
+    config.firePosition !== null &&
     config.agentPositions.length === config.numAgents
 
   return (

@@ -198,7 +198,7 @@ export function SimulationWizard() {
   }
 
   const pollSimulationStatus = async (jobId: string) => {
-    const maxAttempts = 120 // 2 minutes max
+    const maxAttempts = 600 // 10 minutes max
     let attempts = 0
 
     while (attempts < maxAttempts) {
@@ -244,7 +244,7 @@ export function SimulationWizard() {
       }
     }
 
-    throw new Error("Simulation timeout after 2 minutes")
+    throw new Error("Simulation timeout after 10 minutes")
   }
 
   const handleReset = () => {
@@ -378,8 +378,12 @@ export function SimulationWizard() {
         </Card>
       )}
 
-      {stage === "results" && data.results && (
-        <SimulationResults results={data.results} onReset={handleReset} />
+      {stage === "results" && data.results && data.grid && (
+        <SimulationResults
+          results={data.results}
+          grid={data.grid}
+          onReset={handleReset}
+        />
       )}
     </div>
   )
