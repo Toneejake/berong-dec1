@@ -1,6 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server"
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
+const BACKEND_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
 const PPO_VERSION = "500k_steps" // Options: "v1.5", "v2.0_lite", "500k_steps", "v2.0"
 
 export async function POST(request: NextRequest) {

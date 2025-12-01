@@ -30,7 +30,7 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://${POSTGRES_USER:-bfp_user}:${POSTGRES_PASSWORD:-bfp_secret_password}@postgres:5432/${POSTGRES_DB:-bfp_berong}?schema=public
-      - SIMULATION_API_URL=http://python-backend:8000
+      - BACKEND_URL=http://python-backend:8000
     depends_on:
       postgres:
         condition: service_healthy
