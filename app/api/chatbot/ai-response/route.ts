@@ -1,12 +1,14 @@
 import { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
+const BACKEND_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
 export async function POST(request: NextRequest) {
   try {
     const { message } = await request.json();
     
     // Forward the request to the FastAPI backend
-    const backendResponse = await fetch('http://localhost:8000/api/chatbot/ai-response', {
+    const backendResponse = await fetch(`${BACKEND_URL}/api/chatbot/ai-response`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
