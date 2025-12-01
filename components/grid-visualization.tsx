@@ -5,6 +5,8 @@ import { Card } from "@/components/ui/card"
 
 interface GridVisualizationProps {
   grid: number[][]
+  originalImage?: string | null // Base64 image to use as background
+  showWallOverlay?: boolean // Whether to show semi-transparent wall overlay
   firePosition?: [number, number] | null
   fireMap?: [number, number][] // Array of fire coordinates
   agentPositions?: [number, number][]
@@ -15,6 +17,8 @@ interface GridVisualizationProps {
 
 export function GridVisualization({
   grid,
+  originalImage,
+  showWallOverlay = true,
   firePosition,
   fireMap = [],
   agentPositions = [],
@@ -24,9 +28,21 @@ export function GridVisualization({
 }: GridVisualizationProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [hoveredCell, setHoveredCell] = useState<[number, number] | null>(null)
+  const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null)
 
   const cellSize = 3 // pixels per cell for 256x256 grid
   const canvasSize = grid.length * cellSize
+
+  // Load background image when originalImage prop changes
+  useEffect(() => {
+    if (originalImage) {
+      const img = new Image()
+      img.onload = () => setBackgroundImage(img)
+      img.src = originalImage.startsWith('data:') ? originalImage : `data:image/png;base64,${originalImage}`
+    } else {
+      setBackgroundImage(null)
+    }
+  }, [originalImage])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -38,37 +54,109 @@ export function GridVisualization({
     // Clear canvas
     ctx.clearRect(0, 0, canvasSize, canvasSize)
 
-    // Draw grid
-    for (let row = 0; row < grid.length; row++) {
-      for (let col = 0; col < grid[row].length; col++) {
-        const isWall = grid[row][col] === 1
-        // Check for fire in both single position and fire map
-        const isFireOrigin = firePosition && firePosition[0] === row && firePosition[1] === col
-        const isFireSpread = fireMap.some(([r, c]) => r === row && c === col)
-        const isFire = isFireOrigin || isFireSpread
-
-        const isAgent = agentPositions.some(([r, c]) => r === row && c === col)
-        const isExit = exits.some(([r, c]) => r === row && c === col)
-        const isHovered = hoveredCell && hoveredCell[0] === row && hoveredCell[1] === col
-
-        if (isFire) {
-          ctx.fillStyle = "#ef4444" // red
-        } else if (isAgent) {
-          ctx.fillStyle = "#3b82f6" // blue
-        } else if (isExit) {
-          ctx.fillStyle = "#22c55e" // green
-        } else if (isWall) {
-          ctx.fillStyle = "#1f2937" // dark gray
-        } else {
-          ctx.fillStyle = "#f3f4f6" // light gray
+    // Draw background image if available, otherwise draw grid-based walls
+    if (backgroundImage) {
+      ctx.drawImage(backgroundImage, 0, 0, canvasSize, canvasSize)
+      
+      // Draw semi-transparent wall overlay if enabled
+      if (showWallOverlay) {
+        ctx.fillStyle = "rgba(31, 41, 55, 0.4)" // dark gray with transparency
+        for (let row = 0; row < grid.length; row++) {
+          for (let col = 0; col < grid[row].length; col++) {
+            if (grid[row][col] === 1) {
+              ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize)
+            }
+          }
         }
-
-        if (isHovered && interactive) {
-          ctx.fillStyle = "#a855f7" // purple for hover
-        }
-
-        ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize)
       }
+    } else {
+      // Fallback: Draw grid-based walls (original behavior)
+      for (let row = 0; row < grid.length; row++) {
+        for (let col = 0; col < grid[row].length; col++) {
+          const isWall = grid[row][col] === 1
+          ctx.fillStyle = isWall ? "#1f2937" : "#f3f4f6"
+          ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize)
+        }
+      }
+    }
+
+    // Draw exits as larger green circles
+    for (const [r, c] of exits) {
+      const centerX = c * cellSize + cellSize / 2
+      const centerY = r * cellSize + cellSize / 2
+      const radius = 5
+
+      ctx.beginPath()
+      ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI)
+      ctx.fillStyle = "#22c55e"
+      ctx.fill()
+      ctx.strokeStyle = "#16a34a"
+      ctx.lineWidth = 1
+      ctx.stroke()
+    }
+
+    // Draw fire with glow effect - collect all fire positions first
+    const firePositions: [number, number][] = []
+    if (firePosition) {
+      firePositions.push(firePosition)
+    }
+    for (const pos of fireMap) {
+      firePositions.push(pos)
+    }
+
+    // Draw fire with realistic glow effect
+    for (const [r, c] of firePositions) {
+      const centerX = c * cellSize + cellSize / 2
+      const centerY = r * cellSize + cellSize / 2
+      
+      // Outer glow (orange)
+      const outerGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 10)
+      outerGradient.addColorStop(0, "rgba(251, 146, 60, 0.9)") // orange-400
+      outerGradient.addColorStop(0.5, "rgba(239, 68, 68, 0.6)") // red-500
+      outerGradient.addColorStop(1, "rgba(239, 68, 68, 0)")
+      ctx.beginPath()
+      ctx.arc(centerX, centerY, 10, 0, 2 * Math.PI)
+      ctx.fillStyle = outerGradient
+      ctx.fill()
+
+      // Inner fire core (yellow-orange)
+      const innerGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 5)
+      innerGradient.addColorStop(0, "rgba(254, 240, 138, 1)") // yellow-200
+      innerGradient.addColorStop(0.4, "rgba(251, 146, 60, 1)") // orange-400
+      innerGradient.addColorStop(1, "rgba(239, 68, 68, 0.8)") // red-500
+      ctx.beginPath()
+      ctx.arc(centerX, centerY, 5, 0, 2 * Math.PI)
+      ctx.fillStyle = innerGradient
+      ctx.fill()
+    }
+
+    // Draw agents as larger blue circles with outline
+    for (const [r, c] of agentPositions) {
+      const centerX = c * cellSize + cellSize / 2
+      const centerY = r * cellSize + cellSize / 2
+      const radius = 6
+
+      // Agent body
+      ctx.beginPath()
+      ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI)
+      ctx.fillStyle = "#3b82f6" // blue-500
+      ctx.fill()
+      ctx.strokeStyle = "#1d4ed8" // blue-700
+      ctx.lineWidth = 1.5
+      ctx.stroke()
+
+      // Small inner highlight
+      ctx.beginPath()
+      ctx.arc(centerX - 1, centerY - 1, 2, 0, 2 * Math.PI)
+      ctx.fillStyle = "rgba(255, 255, 255, 0.4)"
+      ctx.fill()
+    }
+
+    // Draw hovered cell for interactive mode
+    if (hoveredCell && interactive) {
+      const [row, col] = hoveredCell
+      ctx.fillStyle = "rgba(168, 85, 247, 0.5)" // purple with transparency
+      ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize)
     }
 
     // Add grid lines for better visibility (optional, only for smaller grids)
@@ -86,7 +174,7 @@ export function GridVisualization({
         ctx.stroke()
       }
     }
-  }, [grid, firePosition, fireMap, agentPositions, exits, hoveredCell, canvasSize, cellSize, interactive])
+  }, [grid, originalImage, backgroundImage, showWallOverlay, firePosition, fireMap, agentPositions, exits, hoveredCell, canvasSize, cellSize, interactive])
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!interactive || !onCellClick) return

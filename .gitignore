@@ -29,3 +29,12 @@ next-env.d.ts
 
 /plan
 /node_modules
+
+# Database files (runtime, not source)
+*.db
+*.db-journal
+
+# Python virtual environment
+venv/
+__pycache__/
+*.pyc

@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { GridVisualization } from "@/components/grid-visualization"
-import { ArrowLeft, Play, Loader2, Info } from "lucide-react"
+import { ArrowLeft, Play, Loader2, Info, Eye, EyeOff } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 type PPOVersion = "v1.5" | "v2.0_lite" | "500k_steps" | "v2.0"
@@ -17,6 +17,7 @@ const MAX_EXITS = (PPO_VERSION as string) === "v1.5" ? 40 : 248
 
 interface SimulationSetupProps {
   grid: number[][]
+  originalImage?: string | null
   config: {
     numAgents: number
     firePosition: [number, number] | null
@@ -33,6 +34,7 @@ type PlacementMode = "fire" | "agent" | "exit" | "none"
 
 export function SimulationSetup({
   grid,
+  originalImage,
   config,
   onConfigUpdate,
   onRunSimulation,
@@ -41,6 +43,7 @@ export function SimulationSetup({
 }: SimulationSetupProps) {
   const [placementMode, setPlacementMode] = useState<PlacementMode>("none")
   const [autoMode, setAutoMode] = useState(true)
+  const [showWallOverlay, setShowWallOverlay] = useState(true) // Toggle for wall overlay
 
   const handleCellClick = (row: number, col: number) => {
     // Check if cell is valid (not a wall)
@@ -207,8 +210,23 @@ export function SimulationSetup({
           </TabsContent>
         </Tabs>
 
+        {/* Toggle for wall overlay */}
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowWallOverlay(!showWallOverlay)}
+            className="flex items-center gap-2"
+          >
+            {showWallOverlay ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+            {showWallOverlay ? "Hide Walls" : "Show Walls"}
+          </Button>
+        </div>
+
         <GridVisualization
           grid={grid}
+          originalImage={originalImage}
+          showWallOverlay={showWallOverlay}
           firePosition={config.firePosition}
           agentPositions={config.agentPositions}
           exits={config.exits}

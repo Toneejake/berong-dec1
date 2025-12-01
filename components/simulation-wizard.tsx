@@ -350,6 +350,7 @@ export function SimulationWizard() {
       {stage === "setup" && data.grid && (
         <SimulationSetup
           grid={data.grid}
+          originalImage={data.originalImage}
           config={{
             ...data.config,
             exits: data.userExits.map(e => [e.x, e.y] as [number, number])
@@ -382,6 +383,7 @@ export function SimulationWizard() {
         <SimulationResults
           results={data.results}
           grid={data.grid}
+          originalImage={data.originalImage}
           onReset={handleReset}
         />
       )}

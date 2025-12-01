@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Slider } from "@/components/ui/slider"
-import { CheckCircle2, XCircle, RotateCcw, Clock, Users, Flame, Play, Pause, SkipBack, SkipForward } from "lucide-react"
+import { CheckCircle2, XCircle, RotateCcw, Clock, Users, Flame, Play, Pause, SkipBack, SkipForward, Eye, EyeOff } from "lucide-react"
 import { GridVisualization } from "@/components/grid-visualization"
 
 interface SimulationResultsProps {
@@ -34,10 +34,11 @@ interface SimulationResultsProps {
     }
   }
   grid: number[][]
+  originalImage?: string | null
   onReset: () => void
 }
 
-export function SimulationResults({ results, grid, onReset }: SimulationResultsProps) {
+export function SimulationResults({ results, grid, originalImage, onReset }: SimulationResultsProps) {
   const successRate = (results.escaped_count / results.total_agents) * 100
   const isSuccess = results.escaped_count === results.total_agents
 
@@ -45,6 +46,7 @@ export function SimulationResults({ results, grid, onReset }: SimulationResultsP
   const [currentStep, setCurrentStep] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [playbackSpeed, setPlaybackSpeed] = useState(100) // ms per frame
+  const [showWallOverlay, setShowWallOverlay] = useState(true) // Toggle for wall overlay
   const animationRef = useRef<NodeJS.Timeout | null>(null)
 
   const history = results.animation_data?.history || []
@@ -115,10 +117,25 @@ export function SimulationResults({ results, grid, onReset }: SimulationResultsP
           </CardHeader>
           <CardContent>
             <div className="flex flex-col items-center space-y-4">
+              {/* Toggle for wall overlay */}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowWallOverlay(!showWallOverlay)}
+                  className="flex items-center gap-2"
+                >
+                  {showWallOverlay ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                  {showWallOverlay ? "Hide Walls" : "Show Walls"}
+                </Button>
+              </div>
+
               {/* Visualization */}
               <div className="border rounded-lg p-2 bg-white">
                 <GridVisualization
                   grid={grid} // Base grid (walls)
+                  originalImage={originalImage}
+                  showWallOverlay={showWallOverlay}
                   agentPositions={currentFrame.agents ? currentFrame.agents.map((a: any) => a.pos) : []}
                   exits={[]} // Exits are static in base grid or we can pass them if needed
                   fireMap={currentFrame.fire_map}

@@ -1,1 +1,18 @@
+# Git LFS tracking for large files
+# These files will be stored in Git LFS instead of regular Git storage
+
+# AI/ML Models
+*.pth filter=lfs diff=lfs merge=lfs -text
+*.h5 filter=lfs diff=lfs merge=lfs -text
+*.pkl filter=lfs diff=lfs merge=lfs -text
+
+# Compressed files (including model zips)
 *.zip filter=lfs diff=lfs merge=lfs -text
+
+# Ren'Py Web Games (WebAssembly and data files)
+*.wasm filter=lfs diff=lfs merge=lfs -text
+*.data filter=lfs diff=lfs merge=lfs -text
+
+# Large media files (if any)
+*.mp4 filter=lfs diff=lfs merge=lfs -text
+*.webm filter=lfs diff=lfs merge=lfs -text

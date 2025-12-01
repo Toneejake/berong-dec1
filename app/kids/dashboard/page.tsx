@@ -52,14 +52,14 @@ export default function KidsDashboardPage() {
   const loadContent = () => {
     // Create content array with games, videos, and modules
     const content: ContentCardData[] = [
-      // Featured Module/Exam CTA - Always first
+      // SafeScape Course - The main learning course
       {
-        id: "module-main",
-        title: "🎓 Start Your Fire Safety Journey!",
-        description: "Complete fun lessons and become a Junior Fire Marshal",
+        id: "safescape-course",
+        title: "🔥 SafeScape Fire Safety Course",
+        description: "Complete 5 exciting modules to become a Fire Safety Hero! Learn about the Fire Triangle, escape plans, and more!",
         type: "module",
-        emoji: "🚒",
-        href: "/kids/modules",
+        emoji: "🛡️",
+        href: "/kids/safescape",
         isNew: true,
         category: "modules"
       },
@@ -158,57 +158,6 @@ export default function KidsDashboardPage() {
         href: "/kids/memory-game",
         difficulty: "easy",
         category: "activities"
-      },
-
-      // More Modules
-      {
-        id: "module-1",
-        title: "Module 1: Welcome to Fire Safety",
-        description: "Introduction to fire safety and smoke alarms",
-        type: "module",
-        emoji: "📚",
-        href: "/kids/modules/1",
-        category: "modules"
-      },
-      {
-        id: "module-2",
-        title: "Module 2: Kitchen Safety",
-        description: "Learn about kitchen and electrical hazards",
-        type: "module",
-        emoji: "🍳",
-        href: "/kids/modules/2",
-        isLocked: true,
-        category: "modules"
-      },
-      {
-        id: "module-3",
-        title: "Module 3: Escape Plans",
-        description: "Create and practice your family escape plan",
-        type: "module",
-        emoji: "🚪",
-        href: "/kids/modules/3",
-        isLocked: true,
-        category: "modules"
-      },
-      {
-        id: "module-4",
-        title: "Module 4: Community Safety",
-        description: "Learn how to call for help and use fire extinguishers",
-        type: "module",
-        emoji: "🧯",
-        href: "/kids/modules/4",
-        isLocked: true,
-        category: "modules"
-      },
-      {
-        id: "exam-1",
-        title: "🏆 Final Certification Exam",
-        description: "Become a certified Junior Fire Marshal!",
-        type: "exam",
-        emoji: "🎖️",
-        href: "/kids/modules/exam",
-        isLocked: true,
-        category: "modules"
       },
     ]
 
