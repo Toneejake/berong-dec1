@@ -105,9 +105,16 @@ export function FloorPlanCanvas({
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current) return
 
-    const rect = canvasRef.current.getBoundingClientRect()
-    const x = Math.floor(e.clientX - rect.left)
-    const y = Math.floor(e.clientY - rect.top)
+    const canvas = canvasRef.current
+    const rect = canvas.getBoundingClientRect()
+    
+    // Calculate scale factor between displayed size and actual canvas size
+    const scaleX = canvas.width / rect.width
+    const scaleY = canvas.height / rect.height
+    
+    // Get click position relative to canvas, accounting for scaling
+    const x = Math.floor((e.clientX - rect.left) * scaleX)
+    const y = Math.floor((e.clientY - rect.top) * scaleY)
 
     // Check if clicking on existing exit
     const clickedExit = exits.find(exit => {
@@ -156,9 +163,15 @@ export function FloorPlanCanvas({
   const handleCanvasMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current) return
 
-    const rect = canvasRef.current.getBoundingClientRect()
-    const x = Math.floor(e.clientX - rect.left)
-    const y = Math.floor(e.clientY - rect.top)
+    const canvas = canvasRef.current
+    const rect = canvas.getBoundingClientRect()
+    
+    // Calculate scale factor between displayed size and actual canvas size
+    const scaleX = canvas.width / rect.width
+    const scaleY = canvas.height / rect.height
+    
+    const x = Math.floor((e.clientX - rect.left) * scaleX)
+    const y = Math.floor((e.clientY - rect.top) * scaleY)
 
     // Check if hovering over exit
     const hovered = exits.find(exit => {
