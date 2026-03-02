@@ -60,10 +60,13 @@ def a_star_search(grid, start, goal, fire_map=None):
     gscore = {start: 0}
     fscore = {start: heuristic(start, goal)}
     oheap = []
+    open_set = set()
     heapq.heappush(oheap, (fscore[start], start))
+    open_set.add(start)
     
     while oheap:
         current = heapq.heappop(oheap)[1]
+        open_set.discard(current)
         if current == goal:
             data = []
             while current in came_from:
@@ -86,13 +89,14 @@ def a_star_search(grid, start, goal, fire_map=None):
                 # Doors and windows are passable (agents can go through)
             else:
                 continue
-            if neighbor in close_set and tentative_g_score >= gscore.get(neighbor, 0):
+            if neighbor in close_set and tentative_g_score >= gscore.get(neighbor, float('inf')):
                 continue
-            if tentative_g_score < gscore.get(neighbor, 0) or neighbor not in [i[1] for i in oheap]:
+            if tentative_g_score < gscore.get(neighbor, float('inf')) or neighbor not in open_set:
                 came_from[neighbor] = current
                 gscore[neighbor] = tentative_g_score
                 fscore[neighbor] = tentative_g_score + heuristic(neighbor, goal)
                 heapq.heappush(oheap, (fscore[neighbor], neighbor))
+                open_set.add(neighbor)
     
     print(f"[DEBUG] A* Failed: No path found from {start} to {goal}", flush=True)
     return []
@@ -182,10 +186,13 @@ def a_star_exterior_only(grid, start, goal):
     gscore = {start: 0}
     fscore = {start: heuristic(start, goal)}
     oheap = []
+    open_set = set()
     heapq.heappush(oheap, (fscore[start], start))
+    open_set.add(start)
     
     while oheap:
         current = heapq.heappop(oheap)[1]
+        open_set.discard(current)
         if current == goal:
             data = []
             while current in came_from:
@@ -208,13 +215,14 @@ def a_star_exterior_only(grid, start, goal):
             else:
                 continue
                 
-            if neighbor in close_set and tentative_g_score >= gscore.get(neighbor, 0):
+            if neighbor in close_set and tentative_g_score >= gscore.get(neighbor, float('inf')):
                 continue
-            if tentative_g_score < gscore.get(neighbor, 0) or neighbor not in [i[1] for i in oheap]:
+            if tentative_g_score < gscore.get(neighbor, float('inf')) or neighbor not in open_set:
                 came_from[neighbor] = current
                 gscore[neighbor] = tentative_g_score
                 fscore[neighbor] = tentative_g_score + heuristic(neighbor, goal)
                 heapq.heappush(oheap, (fscore[neighbor], neighbor))
+                open_set.add(neighbor)
     
     print(f"[DEBUG] Exterior A* Failed: No path found from {start} to {goal}", flush=True)
     return []
@@ -676,7 +684,7 @@ class EvacuationEnv(gym.Env):
 
 # Heuristic (Non-RL) Simulation Function
 def run_heuristic_simulation(grid, agent_positions, fire_position, exits=None, 
-                              max_steps=500, extended_fire_steps=0, assembly_point=None, material_type="concrete"):
+                              max_steps=500, extended_fire_steps=0, assembly_point=None, material_type="concrete", cancel_event=None):
     """
     Run a heuristic-based simulation without PPO model.
     Supports unlimited agents and provides the same output format as RL simulation.
@@ -817,6 +825,10 @@ def run_heuristic_simulation(grid, agent_positions, fire_position, exits=None,
     MAX_FIRE_COORDS_PER_FRAME = 3000
     
     while step_count < max_steps:
+        if cancel_event and cancel_event.is_set():
+            print(f"[HEURISTIC] Cancelled by timeout at step {step_count}", flush=True)
+            break
+
         step_count += 1
         fire_sim.tick()
         
@@ -881,6 +893,10 @@ def run_heuristic_simulation(grid, agent_positions, fire_position, exits=None,
             max_burn_steps = 500  # Continue until fire fully spreads
             burn_step = 0
             while burn_step < max_burn_steps:
+                if cancel_event and cancel_event.is_set():
+                    print(f"[HEURISTIC] Cancelled by timeout during burn loop", flush=True)
+                    break
+
                 prev_fire_count = np.sum(fire_sim.fire_map)
                 fire_sim.tick()
                 new_fire_count = np.sum(fire_sim.fire_map)
@@ -909,7 +925,11 @@ def run_heuristic_simulation(grid, agent_positions, fire_position, exits=None,
         else:
             # Fixed number of extended steps
             print(f"[HEURISTIC] Running {extended_fire_steps} extended fire steps", flush=True)
-            for _ in range(extended_fire_steps):
+            for ext_step in range(extended_fire_steps):
+                if cancel_event and cancel_event.is_set():
+                    print(f"[HEURISTIC] Cancelled by timeout during extended fire", flush=True)
+                    break
+
                 fire_sim.tick()
                 fire_coords = sample_fire_coords(fire_sim.fire_map, MAX_FIRE_COORDS_PER_FRAME)
                 # Keep agents frozen

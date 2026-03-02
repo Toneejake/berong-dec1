@@ -30,12 +30,14 @@ export async function POST(request: NextRequest) {
         const ai = new GoogleGenAI({ apiKey });
 
         // Generate content WITH the fire safety system prompt
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash',
-            contents: message,
-            config: {
-                // System instruction to restrict topics and format responses
-                systemInstruction: getFireSafetySystemPrompt() + `
+        // SECURITY: 30s timeout to prevent hung Gemini API calls
+        const response = await Promise.race([
+            ai.models.generateContent({
+                model: 'gemini-2.0-flash',
+                contents: message,
+                config: {
+                    // System instruction to restrict topics and format responses
+                    systemInstruction: getFireSafetySystemPrompt() + `
 
 ## Response Formatting
 Always format your responses using markdown for better readability:
@@ -46,12 +48,16 @@ Always format your responses using markdown for better readability:
 - Keep paragraphs short and focused
 - Use emoji sparingly for friendliness (🔥 🧯 🚒)
 `,
-                // Lower temperature = more consistent, less creative
-                temperature: 0.3,
-                // Limit response length for concise answers
-                maxOutputTokens: 800,
-            }
-        });
+                    // Lower temperature = more consistent, less creative
+                    temperature: 0.3,
+                    // Limit response length for concise answers
+                    maxOutputTokens: 800,
+                }
+            }),
+            new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('Gemini API timeout after 30s')), 30000)
+            ),
+        ]);
 
         const responseText = response.text || "I couldn't generate a response.";
 

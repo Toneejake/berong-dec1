@@ -40,10 +40,17 @@ export async function POST(request: NextRequest) {
     const backendFormData = new FormData()
     backendFormData.append("file", file)
 
+    // SECURITY: 60s timeout to prevent hung connections to backend
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 60000)
+
     const response = await fetch(`${BACKEND_URL}/api/process-image`, {
       method: "POST",
-      body: backendFormData
+      body: backendFormData,
+      signal: controller.signal,
     })
+
+    clearTimeout(timeoutId)
 
     if (!response.ok) {
       // Try to extract detailed error message from backend

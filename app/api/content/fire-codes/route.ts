@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAdmin } from '@/lib/admin-auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -68,6 +69,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // SECURITY: Require admin auth for content modifications
+    const auth = await requireAdmin()
+    if (auth instanceof NextResponse) return auth
+
     const body = await request.json();
 
     if (!body.title || !body.sectionNum || !body.content) {

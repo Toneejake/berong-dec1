@@ -150,7 +150,7 @@ POSTGRES_USER=bfp_prod_user
 POSTGRES_PASSWORD=$DB_PASSWORD
 POSTGRES_DB=bfp_berong_prod
 JWT_SECRET=$JWT_SECRET
-GEMINI_API_KEY=AIzaSyCbFsMBnoiQhBW8eT0HlwHUWblNE7XMV2U
+GEMINI_API_KEY=<your-gemini-api-key>
 CORS_ORIGINS=https://bfpscberong.app,https://www.bfpscberong.app,http://nextjs:3000
 EOF
 chmod 600 .env

@@ -99,7 +99,7 @@ def auto_detect_exits(grid: np.ndarray, max_exits: int = 248) -> List[Tuple[int,
     return exits[:max_exits]
 
 
-def _run_simulation_inner(job_id: str, config: SimulationConfig, result_holder: dict):
+def _run_simulation_inner(job_id: str, config: SimulationConfig, result_holder: dict, cancel_event: threading.Event = None):
     try:
         grid = np.array(config.grid)
 
@@ -196,6 +196,7 @@ def _run_simulation_inner(job_id: str, config: SimulationConfig, result_holder: 
                     else None
                 ),
                 material_type=config.material_type,
+                cancel_event=cancel_event,
             )
             update_job_status(job_id, "complete", result=result)
             gc.collect()
@@ -237,6 +238,11 @@ def _run_simulation_inner(job_id: str, config: SimulationConfig, result_holder: 
         )
 
         while not terminated and not truncated and step_count < max_steps:
+            if cancel_event and cancel_event.is_set():
+                result_holder["error"] = "Simulation cancelled due to timeout"
+                print(f"[JOB {job_id[:8]}] Cancelled by timeout during RL main loop", flush=True)
+                return
+
             action = 0
 
             obs, _, terminated, truncated, _ = env.step(action)
@@ -288,6 +294,11 @@ def _run_simulation_inner(job_id: str, config: SimulationConfig, result_holder: 
                 max_burn_steps = 500  # Continue until fire fully spreads
                 burn_step = 0
                 while burn_step < max_burn_steps:
+                    if cancel_event and cancel_event.is_set():
+                        result_holder["error"] = "Simulation cancelled due to timeout"
+                        print(f"[JOB {job_id[:8]}] Cancelled by timeout during RL burn loop", flush=True)
+                        return
+
                     prev_fire_count = np.sum(env.fire_sim.fire_map)
                     env.fire_sim.tick()
                     new_fire_count = np.sum(env.fire_sim.fire_map)
@@ -340,7 +351,12 @@ def _run_simulation_inner(job_id: str, config: SimulationConfig, result_holder: 
                     f"[JOB {job_id[:8]}] Running {config.extended_fire_steps} extended fire steps...",
                     flush=True,
                 )
-                for _ in range(config.extended_fire_steps):
+                for ext_step in range(config.extended_fire_steps):
+                    if cancel_event and cancel_event.is_set():
+                        result_holder["error"] = "Simulation cancelled due to timeout"
+                        print(f"[JOB {job_id[:8]}] Cancelled by timeout during RL extended fire", flush=True)
+                        return
+
                     env.fire_sim.tick()
                     if assembly_point_xy:
                         for agent in env.agents:
@@ -434,10 +450,11 @@ def _run_simulation_inner(job_id: str, config: SimulationConfig, result_holder: 
 def run_simulation_task(job_id: str, config: SimulationConfig):
     """Run the simulation in a dedicated thread with timeout monitoring."""
     result_holder = {}
+    cancel_event = threading.Event()
 
     sim_thread = threading.Thread(
         target=_run_simulation_inner,
-        args=(job_id, config, result_holder),
+        args=(job_id, config, result_holder, cancel_event),
         daemon=True,
     )
     sim_thread.start()
@@ -456,9 +473,13 @@ def run_simulation_task(job_id: str, config: SimulationConfig):
 
     if sim_thread.is_alive():
         print(
-            f"[JOB {job_id[:8]}] TIMEOUT after {SIMULATION_TIMEOUT_SECONDS}s - marking as failed",
+            f"[JOB {job_id[:8]}] TIMEOUT after {SIMULATION_TIMEOUT_SECONDS}s - signalling cancellation",
             flush=True,
         )
+        cancel_event.set()
+        sim_thread.join(timeout=10)  # Give thread 10s to clean up
+        if sim_thread.is_alive():
+            print(f"[JOB {job_id[:8]}] Thread did not exit after cancel signal", flush=True)
         update_job_status(
             job_id,
             "failed",

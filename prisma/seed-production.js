@@ -13,8 +13,11 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting production database seeding...');
 
-  // SECURITY: Use environment variable for admin password, never hardcode
-  const adminPass = process.env.ADMIN_DEFAULT_PASSWORD || 'admin123';
+  // SECURITY: Require environment variable for admin password, never use a weak default
+  const adminPass = process.env.ADMIN_DEFAULT_PASSWORD;
+  if (!adminPass) {
+    throw new Error('ADMIN_DEFAULT_PASSWORD environment variable is required for production seeding. Never use a hardcoded default.');
+  }
   const adminPassword = await bcrypt.hash(adminPass, 12);
 
   // Check if admin exists — NEVER reset the password on restart
