@@ -30,11 +30,13 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // Validate email (optional but must be unique if provided)
-        if (email && email.trim().length > 0) {
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        // Validate email
+        if (!email || email.trim().length === 0) {
+            errors.email = 'Email is required'
+        } else {
+            const emailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/
             if (!emailRegex.test(email)) {
-                errors.email = 'Please enter a valid email address'
+                errors.email = 'Email must be a @gmail.com address'
             } else {
                 const existingEmail = await prisma.user.findUnique({
                     where: { email: email.trim() },
@@ -51,6 +53,8 @@ export async function POST(request: NextRequest) {
             errors.password = 'Password is required'
         } else if (password.length < 8) {
             errors.password = 'Password must be at least 8 characters'
+        } else if (!/[A-Z]/.test(password)) {
+            errors.password = 'Password must contain at least one capital letter'
         }
 
         if (Object.keys(errors).length > 0) {

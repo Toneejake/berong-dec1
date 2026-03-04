@@ -27,9 +27,24 @@ export async function POST(request: NextRequest) {
       preTestAnswers, // Record<questionId, selectedAnswerIndex>
     } = body
 
-    if (!username || !password || !firstName || !lastName || !age) {
+    if (!username || !password || !firstName || !lastName || !age || !email) {
       return NextResponse.json(
-        { success: false, error: 'All fields are required' },
+        { success: false, error: 'All fields are required including email' },
+        { status: 400 }
+      )
+    }
+
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { success: false, error: 'Email must be a @gmail.com address' },
+        { status: 400 }
+      )
+    }
+
+    if (password.length < 8 || !/[A-Z]/.test(password)) {
+      return NextResponse.json(
+        { success: false, error: 'Password must be at least 8 characters and contain at least one capital letter' },
         { status: 400 }
       )
     }

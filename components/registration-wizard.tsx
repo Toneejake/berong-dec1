@@ -194,8 +194,16 @@ export function RegistrationWizard() {
         } else if (!/^[a-zA-Z0-9_]+$/.test(data.username)) {
           errors.username = "Username can only contain letters, numbers, and underscores"
         }
+
+        if (!data.email.trim()) errors.email = "Email is required"
+        else if (!/^[a-zA-Z0-9._%+-]+@gmail\.com$/.test(data.email)) {
+          errors.email = "Email must be a @gmail.com address"
+        }
+
         if (!data.password) errors.password = "Password is required"
         else if (data.password.length < 8) errors.password = "Password must be at least 8 characters"
+        else if (!/[A-Z]/.test(data.password)) errors.password = "Password must contain at least one capital letter"
+
         if (data.password !== data.confirmPassword) errors.confirmPassword = "Passwords do not match"
         if (!data.dataPrivacyConsent) errors.dataPrivacyConsent = "You must agree to the data privacy policy"
         break
@@ -241,7 +249,7 @@ export function RegistrationWizard() {
             body: JSON.stringify({
               username: data.username,
               password: data.password,
-              email: data.email || undefined,
+              email: data.email,
             }),
           })
           const result = await response.json()
@@ -312,7 +320,7 @@ export function RegistrationWizard() {
           occupationOther: data.occupation === "Other (Please specify)" ? data.occupationOther : null,
           gradeLevel: data.gradeLevel || null,
           username: data.username,
-          email: data.email || undefined,
+          email: data.email,
           password: data.password,
           dataPrivacyConsent: data.dataPrivacyConsent,
           preTestAnswers: data.preTestAnswers,
@@ -668,11 +676,11 @@ export function RegistrationWizard() {
             </div>
 
             <div>
-              <Label htmlFor="email">Email (Optional)</Label>
+              <Label htmlFor="email">Email *</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="Enter your email (optional)"
+                placeholder="example@gmail.com"
                 value={data.email}
                 onChange={(e) => updateField("email", e.target.value)}
                 className={validationErrors.email ? "border-red-500" : ""}
