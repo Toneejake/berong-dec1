@@ -200,9 +200,14 @@ export function RegistrationWizard() {
           errors.email = "Email must be a @gmail.com address"
         }
 
+        const COMMON_PASSWORDS = ['password123', 'password', '123456', 'qwerty', 'abc123', 'letmein', 'admin', 'welcome', 'monkey', 'password1', 'iloveyou', 'sunshine', 'princess', 'football', 'shadow', 'master', 'trustno1', 'dragon'];
         if (!data.password) errors.password = "Password is required"
         else if (data.password.length < 8) errors.password = "Password must be at least 8 characters"
-        else if (!/[A-Z]/.test(data.password)) errors.password = "Password must contain at least one capital letter"
+        else if (!/[A-Z]/.test(data.password)) errors.password = "Password must contain at least one uppercase letter"
+        else if (!/[a-z]/.test(data.password)) errors.password = "Password must contain at least one lowercase letter"
+        else if (!/[0-9]/.test(data.password)) errors.password = "Password must contain at least one number"
+        else if (!/[^A-Za-z0-9]/.test(data.password)) errors.password = "Password must contain at least one special character (!@#$%^&*)"
+        else if (COMMON_PASSWORDS.includes(data.password.toLowerCase())) errors.password = "This password is too common. Please choose a stronger one."
 
         if (data.password !== data.confirmPassword) errors.confirmPassword = "Passwords do not match"
         if (!data.dataPrivacyConsent) errors.dataPrivacyConsent = "You must agree to the data privacy policy"

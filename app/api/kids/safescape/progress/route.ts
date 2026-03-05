@@ -152,6 +152,25 @@ export async function POST(request: NextRequest) {
     });
     const wasAlreadyCompleted = existingProgress?.completed || false;
 
+    // Merge section data additively — never revert true back to false
+    const existingSectionData = existingProgress?.sectionData
+      ? JSON.parse(existingProgress.sectionData)
+      : {};
+    const incomingSectionData = sectionData || {};
+    const mergedSectionData: Record<string, boolean> = { ...existingSectionData };
+    for (const [key, value] of Object.entries(incomingSectionData)) {
+      // Only allow setting sections to true, never back to false
+      if (value === true || !mergedSectionData[key]) {
+        mergedSectionData[key] = value as boolean;
+      }
+    }
+
+    // Never downgrade a completed module back to incomplete
+    const finalCompleted = wasAlreadyCompleted ? true : (completed || false);
+    const finalCompletedAt = wasAlreadyCompleted
+      ? existingProgress!.completedAt
+      : (completed ? new Date() : null);
+
     // Upsert progress (create or update)
     const progress = await prisma.safeScapeProgress.upsert({
       where: {
@@ -161,15 +180,15 @@ export async function POST(request: NextRequest) {
         },
       },
       update: {
-        sectionData: JSON.stringify(sectionData || {}),
-        completed: completed || false,
-        completedAt: completed ? new Date() : null,
+        sectionData: JSON.stringify(mergedSectionData),
+        completed: finalCompleted,
+        completedAt: finalCompletedAt,
         updatedAt: new Date(),
       },
       create: {
         userId: user.id,
         moduleNum: parseInt(moduleNum),
-        sectionData: JSON.stringify(sectionData || {}),
+        sectionData: JSON.stringify(incomingSectionData),
         completed: completed || false,
         completedAt: completed ? new Date() : null,
       },

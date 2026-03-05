@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
         // SECURITY: 30s timeout to prevent hung Gemini API calls
         const response = await Promise.race([
             ai.models.generateContent({
-                model: 'gemini-2.0-flash',
+                model: 'gemini-2.5-flash',
                 contents: message,
                 config: {
                     // System instruction to restrict topics and format responses
