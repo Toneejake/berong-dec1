@@ -13,21 +13,21 @@ const kidsVideos = [
   {
     id: "1",
     title: "Fire Safety for Kids",
-    youtubeId: "kMGrundV4KY",
+    youtubeId: "3yJtSSovwJM",
     description: "Learn important fire safety rules in a fun way!",
     emoji: "🎬"
   },
   {
     id: "2",
     title: "Stop, Drop, and Roll",
-    youtubeId: "eDQXFWOy3Ek",
+    youtubeId: "uLp4HE_Zhgg",
     description: "Learn what to do if your clothes catch fire!",
     emoji: "🔥"
   },
   {
     id: "3",
     title: "Meet a Firefighter",
-    youtubeId: "CtvUSvNfVCY",
+    youtubeId: "XamC1CkHbZg",
     description: "See what firefighters do every day!",
     emoji: "🚒"
   },
@@ -119,8 +119,8 @@ export default function KidsVideosPage() {
               key={video.id}
               onClick={() => setSelectedVideo(video)}
               className={`cursor-pointer transition-all border-4 hover:shadow-xl hover:-translate-y-1 ${selectedVideo.id === video.id
-                  ? 'border-purple-500 bg-purple-50 scale-105'
-                  : 'border-transparent hover:border-purple-300'
+                ? 'border-purple-500 bg-purple-50 scale-105'
+                : 'border-transparent hover:border-purple-300'
                 }`}
             >
               <CardContent className="p-5">
