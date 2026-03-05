@@ -42,9 +42,41 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (password.length < 8 || !/[A-Z]/.test(password)) {
+    // Strong password validation
+    const COMMON_PASSWORDS = ['password123', 'password', '123456', 'qwerty', 'abc123', 'letmein', 'admin', 'welcome', 'monkey', 'password1', 'iloveyou', 'sunshine', 'princess', 'football', 'shadow', 'master', 'trustno1', 'dragon'];
+    if (password.length < 8) {
       return NextResponse.json(
-        { success: false, error: 'Password must be at least 8 characters and contain at least one capital letter' },
+        { success: false, error: 'Password must be at least 8 characters' },
+        { status: 400 }
+      )
+    }
+    if (!/[A-Z]/.test(password)) {
+      return NextResponse.json(
+        { success: false, error: 'Password must contain at least one uppercase letter' },
+        { status: 400 }
+      )
+    }
+    if (!/[a-z]/.test(password)) {
+      return NextResponse.json(
+        { success: false, error: 'Password must contain at least one lowercase letter' },
+        { status: 400 }
+      )
+    }
+    if (!/[0-9]/.test(password)) {
+      return NextResponse.json(
+        { success: false, error: 'Password must contain at least one number' },
+        { status: 400 }
+      )
+    }
+    if (!/[^A-Za-z0-9]/.test(password)) {
+      return NextResponse.json(
+        { success: false, error: 'Password must contain at least one special character (!@#$%^&*)' },
+        { status: 400 }
+      )
+    }
+    if (COMMON_PASSWORDS.includes(password.toLowerCase())) {
+      return NextResponse.json(
+        { success: false, error: 'This password is too common. Please choose a stronger one.' },
         { status: 400 }
       )
     }

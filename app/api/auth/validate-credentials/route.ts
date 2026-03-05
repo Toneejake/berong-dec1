@@ -48,13 +48,22 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // Validate password
+        // Validate password (strong rules)
+        const COMMON_PASSWORDS = ['password123', 'password', '123456', 'qwerty', 'abc123', 'letmein', 'admin', 'welcome', 'monkey', 'password1', 'iloveyou', 'sunshine', 'princess', 'football', 'shadow', 'master', 'trustno1', 'dragon'];
         if (!password) {
             errors.password = 'Password is required'
         } else if (password.length < 8) {
             errors.password = 'Password must be at least 8 characters'
         } else if (!/[A-Z]/.test(password)) {
-            errors.password = 'Password must contain at least one capital letter'
+            errors.password = 'Password must contain at least one uppercase letter'
+        } else if (!/[a-z]/.test(password)) {
+            errors.password = 'Password must contain at least one lowercase letter'
+        } else if (!/[0-9]/.test(password)) {
+            errors.password = 'Password must contain at least one number'
+        } else if (!/[^A-Za-z0-9]/.test(password)) {
+            errors.password = 'Password must contain at least one special character (!@#$%^&*)'
+        } else if (COMMON_PASSWORDS.includes(password.toLowerCase())) {
+            errors.password = 'This password is too common. Please choose a stronger one.'
         }
 
         if (Object.keys(errors).length > 0) {

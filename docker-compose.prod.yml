@@ -33,13 +33,13 @@ services:
       - no-new-privileges:true
     read_only: true
     tmpfs:
-      - /var/cache/nginx
-      - /var/run
+      - /var/cache/nginx:size=512m
+      - /var/run:size=1m
     deploy:
       resources:
         limits:
-          memory: 128M
-          cpus: '0.25'
+          memory: 384M
+          cpus: '0.5'
 
   # PostgreSQL Database
   postgres:
@@ -62,6 +62,7 @@ services:
     # No external ports - only accessible within Docker network
     expose:
       - "5432"
+    command: ["postgres", "-c", "max_connections=200", "-c", "shared_buffers=256MB", "-c", "work_mem=4MB"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
@@ -72,8 +73,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
-          cpus: '0.5'
+          memory: 1G
+          cpus: '0.75'
 
   # Next.js Frontend Application
   nextjs:
