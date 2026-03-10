@@ -1,4 +1,4 @@
-var cacheName = 'msunicorn';
+var cacheName = 'msunicorn-v2';
 
 /* Start the service worker and cache all of the app's content or use the existing one */
 self.addEventListener('install', function (e) {
@@ -6,7 +6,14 @@ self.addEventListener('install', function (e) {
 });
 
 self.addEventListener('activate', function (e) {
-    return self.clients.claim();
+    e.waitUntil(
+        caches.keys().then(function (names) {
+            return Promise.all(
+                names.filter(function (name) { return name !== cacheName; })
+                     .map(function (name) { return caches.delete(name); })
+            );
+        }).then(function () { return self.clients.claim(); })
+    );
 });
 
 
