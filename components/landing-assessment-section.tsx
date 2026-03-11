@@ -45,8 +45,30 @@ interface EligibilityData {
     isAdult?: boolean
 }
 
-export function LandingAssessmentSection() {
-    const { user, isAuthenticated, isLoading } = useAuth()
+interface ServerUser {
+    id: number
+    name: string
+    age?: number
+    role: string
+}
+
+interface LandingAssessmentProps {
+    serverUser?: ServerUser | null
+}
+
+export function LandingAssessmentSection({ serverUser }: LandingAssessmentProps = {}) {
+    const { user: clientUser, isAuthenticated: clientIsAuthenticated, isLoading } = useAuth()
+
+    // Use server-provided user when available (avoids waiting for client auth check)
+    const user = clientUser || (serverUser ? {
+        ...serverUser,
+        username: '',
+        permissions: { accessKids: false, accessAdult: false, accessProfessional: false, isAdmin: false },
+        isActive: true,
+        createdAt: '',
+    } as any : null)
+    const isAuthenticated = clientIsAuthenticated || !!serverUser
+
     const router = useRouter()
     const [loading, setLoading] = useState(false)
     const [downloading, setDownloading] = useState(false)
@@ -69,9 +91,10 @@ export function LandingAssessmentSection() {
     }
 
     useEffect(() => {
-        if (!isLoading && isAuthenticated) {
+        // If server already told us the user is authenticated, check immediately
+        if (isAuthenticated) {
             checkEligibility()
-        } else {
+        } else if (!isLoading && !isAuthenticated) {
             setLoading(false);
         }
     }, [isLoading, isAuthenticated])

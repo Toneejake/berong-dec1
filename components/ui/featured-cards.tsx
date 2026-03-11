@@ -58,8 +58,29 @@ const mockFeaturedCards: FeaturedCardItem[] = [
   },
 ];
 
-export function FeaturedCards() {
-  const { user } = useAuth();
+interface ServerUser {
+  id: number;
+  name: string;
+  age?: number;
+  role: string;
+}
+
+export function FeaturedCards({ serverUser }: { serverUser?: ServerUser | null } = {}) {
+  const { user: clientUser } = useAuth();
+
+  // Use client user if available, otherwise reconstruct from serverUser
+  const user = clientUser || (serverUser ? {
+    ...serverUser,
+    permissions: serverUser.role === 'admin'
+      ? { accessKids: true, accessAdult: true, accessProfessional: true, isAdmin: true }
+      : serverUser.role === 'professional'
+        ? { accessKids: true, accessAdult: true, accessProfessional: true, isAdmin: false }
+        : serverUser.role === 'adult'
+          ? { accessKids: false, accessAdult: true, accessProfessional: false, isAdmin: false }
+          : serverUser.role === 'kid'
+            ? { accessKids: true, accessAdult: false, accessProfessional: false, isAdmin: false }
+            : { accessKids: false, accessAdult: false, accessProfessional: false, isAdmin: false }
+  } as any : null);
 
   const visibleCards = mockFeaturedCards.filter(card => {
     // 1. Not logged in — hide cards entirely
