@@ -55,6 +55,7 @@ const teamMembers = [
         image: "/velina_1x1.png",
         socials: [
             { icon: Github, url: "https://github.com/sitol2", label: "GitHub" },
+            { icon: Globe, url: "https://portfolio-sitol2s-projects.vercel.app/", label: "Portfolio" },
             { icon: Linkedin, url: "https://www.linkedin.com/in/keinji-velina-423736326/", label: "LinkedIn" },
         ],
         color: "from-blue-500 to-cyan-500",
